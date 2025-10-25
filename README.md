@@ -1,4 +1,11 @@
-# 🏗 Scaffold-ETH 2
+# slots 
+
+Using commit-reveal for provably fair randomness-driven slots.
+
+The goal of this project is to learn how token-based treasury management can work using Uniswap for LP (liquidity provision) and automated buy/sell operations.
+
+
+## Build with 🏗 Scaffold-ETH 2
 
 <h4 align="center">
   <a href="https://docs.scaffoldeth.io">Documentation</a> |
