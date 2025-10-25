@@ -1,0 +1,468 @@
+//SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "forge-std/Test.sol";
+import "../contracts/RugSlot.sol";
+import "../contracts/RugSlotToken.sol";
+import "../contracts/SimpleTokenSale.sol";
+
+contract RugSlotTest is Test {
+    RugSlot public slot;
+    RugSlotToken public token;
+    
+    address public owner;
+    address public player1 = address(0x100);
+    address public player2 = address(0x200);
+    address public player3 = address(0x300);
+    
+    uint256 public constant TOKEN_PRICE = 0.0001 ether;
+    uint256 public constant BET_SIZE = 0.00001 ether;
+    
+    function setUp() public {
+        // Deploy token first
+        token = new RugSlotToken();
+        
+        // Deploy slot machine with token address
+        slot = new RugSlot(address(token));
+        
+        // Transfer token ownership to slot machine
+        token.transferOwnership(address(slot));
+        
+        owner = slot.owner();
+        
+        // Give test addresses some ETH
+        vm.deal(owner, 100 ether);
+        vm.deal(player1, 100 ether);
+        vm.deal(player2, 100 ether);
+        vm.deal(player3, 100 ether);
+    }
+    
+    // ============ Token Sale Tests ============
+    
+    function testBuyTokens() public {
+        vm.prank(player1);
+        slot.buyTokens{value: TOKEN_PRICE}();
+        
+        assertEq(token.balanceOf(player1), 1 ether);
+        assertEq(token.totalSupply(), 1 ether);
+        assertEq(address(slot).balance, TOKEN_PRICE);
+    }
+    
+    function testBuyMultipleTokens() public {
+        vm.prank(player1);
+        slot.buyTokens{value: TOKEN_PRICE * 3}();
+        
+        assertEq(token.balanceOf(player1), 3 ether);
+        assertEq(token.totalSupply(), 3 ether);
+    }
+    
+    function testBuyTokensInvalidAmount() public {
+        vm.prank(player1);
+        vm.expectRevert("Must send exact multiples of token price");
+        slot.buyTokens{value: TOKEN_PRICE + 1}();
+    }
+    
+    function testBuyTokensExceedsMax() public {
+        vm.prank(player1);
+        vm.expectRevert("Exceeds max sale tokens");
+        slot.buyTokens{value: TOKEN_PRICE * 6}();
+    }
+    
+    function testPhaseTransition() public {
+        // Buy all 5 tokens
+        vm.prank(player1);
+        slot.buyTokens{value: TOKEN_PRICE * 5}();
+        
+        // Should now be in CLOSED phase
+        assertEq(uint256(slot.currentPhase()), uint256(SimpleTokenSale.Phase.CLOSED));
+        assertEq(token.totalSupply(), 5 ether);
+    }
+    
+    function testCannotBuyInActivePhase() public {
+        // Buy all tokens to transition
+        vm.prank(player1);
+        slot.buyTokens{value: TOKEN_PRICE * 5}();
+        
+        // Try to buy more
+        vm.prank(player2);
+        vm.expectRevert("Wrong phase");
+        slot.buyTokens{value: TOKEN_PRICE}();
+    }
+    
+    // ============ Commit-Reveal Tests ============
+    
+    function testCommit() public {
+        // First transition to ACTIVE
+        _transitionToActive();
+        
+        // Create commit hash
+        uint256 secret = 12345;
+        bytes32 commitHash = keccak256(abi.encodePacked(secret));
+        
+        vm.prank(player1);
+        uint256 commitId = slot.commit{value: BET_SIZE}(commitHash);
+        
+        assertEq(commitId, 0);
+        assertEq(address(slot).balance, TOKEN_PRICE * 5 + BET_SIZE);
+        
+        // Check commit was stored
+        (bytes32 storedHash, uint256 commitBlock, , , bool revealed) = 
+            slot.commits(player1, commitId);
+        
+        assertEq(storedHash, commitHash);
+        assertEq(commitBlock, block.number);
+        assertEq(revealed, false);
+    }
+    
+    function testCannotCommitInSalePhase() public {
+        uint256 secret = 12345;
+        bytes32 commitHash = keccak256(abi.encodePacked(secret));
+        
+        vm.prank(player1);
+        vm.expectRevert("Wrong phase");
+        slot.commit{value: BET_SIZE}(commitHash);
+    }
+    
+    function testCommitInvalidBetSize() public {
+        _transitionToActive();
+        
+        uint256 secret = 12345;
+        bytes32 commitHash = keccak256(abi.encodePacked(secret));
+        
+        vm.prank(player1);
+        vm.expectRevert("Must bet exactly 0.00001 ETH");
+        slot.commit{value: BET_SIZE + 1}(commitHash);
+    }
+    
+    function testMultipleCommits() public {
+        _transitionToActive();
+        
+        vm.startPrank(player1);
+        
+        bytes32 commit1 = keccak256(abi.encodePacked(uint256(111)));
+        bytes32 commit2 = keccak256(abi.encodePacked(uint256(222)));
+        
+        uint256 id1 = slot.commit{value: BET_SIZE}(commit1);
+        uint256 id2 = slot.commit{value: BET_SIZE}(commit2);
+        
+        assertEq(id1, 0);
+        assertEq(id2, 1);
+        assertEq(slot.commitCount(player1), 2);
+        
+        vm.stopPrank();
+    }
+    
+    function testRevealTooEarly() public {
+        _transitionToActive();
+        
+        uint256 secret = 12345;
+        bytes32 commitHash = keccak256(abi.encodePacked(secret));
+        
+        vm.prank(player1);
+        uint256 commitId = slot.commit{value: BET_SIZE}(commitHash);
+        
+        // Try to reveal in same block
+        vm.prank(player1);
+        vm.expectRevert("Must wait at least 1 block");
+        slot.revealAndCollect(commitId, secret);
+    }
+    
+    function testRevealInvalidSecret() public {
+        _transitionToActive();
+        
+        uint256 secret = 12345;
+        bytes32 commitHash = keccak256(abi.encodePacked(secret));
+        
+        vm.prank(player1);
+        uint256 commitId = slot.commit{value: BET_SIZE}(commitHash);
+        
+        // Move to next block
+        vm.roll(block.number + 1);
+        
+        // Try to reveal with wrong secret
+        vm.prank(player1);
+        vm.expectRevert("Invalid secret");
+        slot.revealAndCollect(commitId, 99999);
+    }
+    
+    function testReveal() public {
+        _transitionToActive();
+        
+        uint256 secret = 12345;
+        bytes32 commitHash = keccak256(abi.encodePacked(secret));
+        
+        vm.prank(player1);
+        uint256 commitId = slot.commit{value: BET_SIZE}(commitHash);
+        
+        // Move to next block
+        vm.roll(block.number + 1);
+        
+        vm.prank(player1);
+        slot.revealAndCollect(commitId, secret);
+        
+        // Check that it was revealed (don't care about win/loss)
+        (, , , , bool revealed) = slot.commits(player1, commitId);
+        assertTrue(revealed);
+    }
+    
+    function testRevealAndCheckResult() public {
+        _transitionToActive();
+        
+        // Try multiple times until we get at least one win and one loss
+        bool foundWin = false;
+        bool foundLoss = false;
+        
+        for (uint256 i = 0; i < 20 && (!foundWin || !foundLoss); i++) {
+            uint256 secret = 1000 + i;
+            bytes32 commitHash = keccak256(abi.encodePacked(secret));
+            
+            vm.prank(player1);
+            uint256 commitId = slot.commit{value: BET_SIZE}(commitHash);
+            
+            vm.roll(block.number + 1);
+            
+            vm.prank(player1);
+            slot.revealAndCollect(commitId, secret);
+            
+            (, , uint256 amountWon, , bool revealed) = slot.commits(player1, commitId);
+            assertTrue(revealed);
+            
+            if (amountWon > 0) {
+                assertEq(amountWon, BET_SIZE * 2);
+                foundWin = true;
+            } else {
+                assertEq(amountWon, 0);
+                foundLoss = true;
+            }
+            
+            vm.deal(player1, 100 ether);
+        }
+        
+        assertTrue(foundWin, "Should have found at least one win");
+        assertTrue(foundLoss, "Should have found at least one loss");
+    }
+    
+    function testIsWinnerView() public {
+        _transitionToActive();
+        
+        uint256 secret = 12345;
+        bytes32 commitHash = keccak256(abi.encodePacked(secret));
+        
+        vm.prank(player1);
+        uint256 commitId = slot.commit{value: BET_SIZE}(commitHash);
+        
+        // Move to next block
+        vm.roll(block.number + 1);
+        
+        // Check isWinner without revealing (don't care if win or loss, just that it works)
+        (bool won, uint256 result) = slot.isWinner(player1, commitId, secret);
+        
+        // Result should be 1-10
+        assertTrue(result >= 1 && result <= 10);
+        
+        // Won should match the result
+        if (result >= 1 && result <= 4) {
+            assertTrue(won);
+        } else {
+            assertFalse(won);
+        }
+    }
+    
+    function testIsWinnerInvalidSecret() public {
+        _transitionToActive();
+        
+        uint256 secret = 12345;
+        bytes32 commitHash = keccak256(abi.encodePacked(secret));
+        
+        vm.prank(player1);
+        uint256 commitId = slot.commit{value: BET_SIZE}(commitHash);
+        
+        // Move to next block
+        vm.roll(block.number + 1);
+        
+        // Try to check with wrong secret
+        vm.expectRevert("Invalid secret");
+        slot.isWinner(player1, commitId, 99999);
+    }
+    
+    function testRevealExpired() public {
+        _transitionToActive();
+        
+        uint256 secret = 12345;
+        bytes32 commitHash = keccak256(abi.encodePacked(secret));
+        
+        vm.prank(player1);
+        uint256 commitId = slot.commit{value: BET_SIZE}(commitHash);
+        
+        // Move past the 256 block window
+        vm.roll(block.number + 257);
+        
+        vm.prank(player1);
+        slot.revealAndCollect(commitId, secret);
+        
+        // Should be forfeited
+        (, , uint256 amountWon, , bool revealed) = slot.commits(player1, commitId);
+        assertEq(amountWon, 0);
+        assertTrue(revealed);
+    }
+    
+    function testCannotRevealTwice() public {
+        _transitionToActive();
+        
+        uint256 secret = _findLosingSecret();
+        bytes32 commitHash = keccak256(abi.encodePacked(secret));
+        
+        vm.prank(player1);
+        uint256 commitId = slot.commit{value: BET_SIZE}(commitHash);
+        
+        vm.roll(block.number + 1);
+        
+        vm.prank(player1);
+        slot.revealAndCollect(commitId, secret);
+        
+        // Try to collect again - already revealed, no winnings
+        vm.prank(player1);
+        vm.expectRevert("No winnings");
+        slot.revealAndCollect(commitId, secret);
+    }
+    
+    // Note: Collection tests are integrated into RevealAndCollect tests above since they're now one function
+    
+    // ============ Owner Functions Tests ============
+    
+    function testRugFunction() public {
+        _transitionToActive();
+        
+        uint256 contractBalance = address(slot).balance;
+        uint256 ownerBalanceBefore = owner.balance;
+        
+        vm.prank(owner);
+        slot.rug();
+        
+        assertEq(address(slot).balance, 0);
+        assertEq(owner.balance, ownerBalanceBefore + contractBalance);
+    }
+    
+    function testRugNotOwner() public {
+        vm.prank(player1);
+        vm.expectRevert("Not the owner");
+        slot.rug();
+    }
+    
+    function testAddLiquidityNotOwner() public {
+        _transitionToActive();
+        
+        vm.prank(player1);
+        vm.expectRevert("Not the owner");
+        slot.addLiquidity();
+    }
+    
+    function testAddLiquidityWrongPhase() public {
+        // Fund contract but stay in OPEN phase to test phase check
+        vm.deal(address(slot), 1 ether);
+        
+        vm.prank(owner);
+        vm.expectRevert("Must be in CLOSED phase");
+        slot.addLiquidity();
+    }
+    
+    function testAddLiquidityInsufficientETH() public {
+        // Buy only 2 tokens to get to CLOSED but not have enough ETH
+        // 2 tokens = 0.0002 ETH, but liquidity needs 0.00025 ETH
+        vm.prank(player1);
+        slot.buyTokens{value: TOKEN_PRICE * 2}();
+        
+        // Get to CLOSED phase
+        vm.prank(player2);
+        slot.buyTokens{value: TOKEN_PRICE * 3}();
+        
+        // Now in CLOSED but only have 0.0005 ETH (5 * 0.0001)
+        // Need at least 0.00025 for liquidity, but we have 0.0005
+        // Actually this won't work - let me rug some ETH first
+        
+        vm.prank(owner);
+        slot.rug();
+        
+        // Give back less than needed
+        vm.deal(address(slot), 0.0001 ether);
+        
+        vm.prank(owner);
+        vm.expectRevert("Insufficient ETH");
+        slot.addLiquidity();
+    }
+    
+    // ============ Statistical Tests ============
+    
+    function testHouseEdge() public {
+        _transitionToActive();
+        
+        uint256 trials = 100;
+        uint256 wins = 0;
+        
+        for (uint256 i = 0; i < trials; i++) {
+            uint256 secret = i + 1000;
+            bytes32 commitHash = keccak256(abi.encodePacked(secret));
+            
+            vm.prank(player1);
+            uint256 commitId = slot.commit{value: BET_SIZE}(commitHash);
+            
+            vm.roll(block.number + 1);
+            
+            (bool won, ) = slot.isWinner(player1, commitId, secret);
+            
+            if (won) {
+                wins++;
+            }
+            
+            // Reveal to clean up (losers just reveal, winners would get paid)
+            vm.prank(player1);
+            slot.revealAndCollect(commitId, secret);
+            
+            // Move to next block for next commit
+            vm.roll(block.number + 1);
+            
+            // Fund player1 again
+            vm.deal(player1, 100 ether);
+        }
+        
+        // Win rate should be around 40% (4 in 10)
+        // With 100 trials, we expect around 40 wins, give or take
+        console.log("Wins:", wins, "out of", trials);
+        assertTrue(wins >= 25 && wins <= 55, "Win rate outside expected range");
+    }
+    
+    // ============ Helper Functions ============
+    
+    function _transitionToActive() internal {
+        vm.prank(player1);
+        slot.buyTokens{value: TOKEN_PRICE * 5}();
+    }
+    
+    function _findWinningSecret() internal view returns (uint256) {
+        // Try different secrets until we find one that wins (1-4)
+        for (uint256 i = 1; i < 1000; i++) {
+            bytes32 blockHash = blockhash(block.number);
+            bytes32 seed = keccak256(abi.encodePacked(blockHash, uint256(0), i));
+            uint256 result = (uint256(seed) % 10) + 1;
+            if (result >= 1 && result <= 4) {
+                return i;
+            }
+        }
+        revert("Could not find winning secret");
+    }
+    
+    function _findLosingSecret() internal view returns (uint256) {
+        // Try different secrets until we find one that loses (5-10)
+        for (uint256 i = 1; i < 1000; i++) {
+            bytes32 blockHash = blockhash(block.number);
+            bytes32 seed = keccak256(abi.encodePacked(blockHash, uint256(0), i));
+            uint256 result = (uint256(seed) % 10) + 1;
+            if (result >= 5 && result <= 10) {
+                return i;
+            }
+        }
+        revert("Could not find losing secret");
+    }
+    
+}
+
