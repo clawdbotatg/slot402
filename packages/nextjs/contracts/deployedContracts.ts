@@ -1076,7 +1076,7 @@ const deployedContracts = {
   },
   31337: {
     RugSlotToken: {
-      address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
+      address: "0x700b6a60ce7eaaea56f065753d8dcb9653dbad35",
       abi: [
         {
           type: "constructor",
@@ -1456,10 +1456,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 1,
     },
     RugSlot: {
-      address: "0xe1aa25618fa0c7a1cfdab5d6b456af611873b629",
+      address: "0xa15bb66138824a1c7167f5e85b957d04dd34e468",
       abi: [
         {
           type: "constructor",
@@ -2140,7 +2140,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 2,
     },
   },
   42161: {
