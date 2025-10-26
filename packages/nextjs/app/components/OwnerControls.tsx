@@ -69,7 +69,7 @@ export function OwnerControls({ connectedAddress }: OwnerControlsProps) {
       <p className="mb-4">You are the owner!</p>
       <div className="flex gap-2 flex-wrap">
         <button className="btn btn-error" onClick={handleAddLiquidity}>
-          Add Liquidity (0.015 ETH + 150 tokens)
+          Add Liquidity (0.00015 ETH + 1.5 tokens)
         </button>
         <button className="btn btn-error" onClick={handleRemoveLiquidity}>
           Remove Liquidity

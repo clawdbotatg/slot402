@@ -81,7 +81,7 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     // ============ Constructor ============
     
     constructor(address _tokenAddress) 
-        SimpleTokenSale(_tokenAddress, 0.0001 ether, 1500 * 10**18)
+        SimpleTokenSale(_tokenAddress, 0.0001 ether, 15 * 10**18) // TESTING: 1/100 of normal (was 1500)
         ManagedTreasury(_tokenAddress) 
     {
         _owner = 0x05937Df8ca0636505d92Fd769d303A3D461587ed;

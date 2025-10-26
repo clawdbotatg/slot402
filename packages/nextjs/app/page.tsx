@@ -253,6 +253,13 @@ export default function Home() {
 
       console.log("Success! Checking if fully paid...");
 
+      // Play coin win sound
+      const coinWin = new Audio("/sounds/69682__lukaso__coinwin.wav");
+      coinWin.volume = 0.7;
+      coinWin.play().catch(error => {
+        console.log("Error playing coin win sound:", error);
+      });
+
       // Wait a moment for the transaction to be mined, then update
       setTimeout(async () => {
         if (!publicClient) return;
@@ -366,6 +373,15 @@ export default function Home() {
                     onAllReelsComplete={() => {
                       console.log("🎉 All reels animation complete! Button enabled.");
                       setReelsAnimating(false);
+
+                      // If there are pending reveals, play jackpot alarm
+                      if (pendingReveals.length > 0) {
+                        const jackpotAlarm = new Audio("/sounds/541655__timbre__jackpot-alarm.wav");
+                        jackpotAlarm.volume = 0.6;
+                        jackpotAlarm.play().catch(error => {
+                          console.log("Error playing jackpot alarm:", error);
+                        });
+                      }
                     }}
                     reel1Symbols={reel1Symbols}
                     reel2Symbols={reel2Symbols}
@@ -413,15 +429,32 @@ export default function Home() {
                       borderRadius: "0",
                       backgroundColor: "red",
                       fontSize: "14px",
-                      boxShadow: "0 13px 0 0 black",
+                      boxShadow: "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black",
                       position: "relative",
                       zIndex: 10,
                       border: "4px solid black",
+                      transform: "perspective(400px) rotateX(8deg)",
+                      transformStyle: "preserve-3d",
+                      transition: "transform 0.1s ease, box-shadow 0.1s ease",
                     }}
                     onClick={handleRollButtonClick}
                     disabled={
                       !!connectedAddress && (isCommitting || isPolling || reelsAnimating || commitCount === undefined)
                     }
+                    onMouseDown={e => {
+                      if (!e.currentTarget.disabled) {
+                        e.currentTarget.style.transform = "perspective(400px) rotateX(8deg) translateY(4px)";
+                        e.currentTarget.style.boxShadow = "4px 4px 0 0 rgba(0, 0, 0, 0.8), 0 4px 0 0 black";
+                      }
+                    }}
+                    onMouseUp={e => {
+                      e.currentTarget.style.transform = "perspective(400px) rotateX(8deg)";
+                      e.currentTarget.style.boxShadow = "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black";
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.transform = "perspective(400px) rotateX(8deg)";
+                      e.currentTarget.style.boxShadow = "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black";
+                    }}
                   >
                     {!connectedAddress
                       ? "Connect Wallet"
@@ -432,23 +465,26 @@ export default function Home() {
                 </div>
 
                 {/* Pending Reveals - positioned over the slot machine */}
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "750px",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    zIndex: 100,
-                    width: "90%",
-                    maxWidth: "800px",
-                  }}
-                >
-                  <PendingRevealsSection
-                    pendingReveals={pendingReveals}
-                    currentBlockNumber={currentBlockNumber}
-                    onCollect={handleCollectFromReveal}
-                  />
-                </div>
+                {/* Only show uncollected winnings after reels finish animating */}
+                {!reelsAnimating && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "750px",
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      zIndex: 100,
+                      width: "90%",
+                      maxWidth: "800px",
+                    }}
+                  >
+                    <PendingRevealsSection
+                      pendingReveals={pendingReveals}
+                      currentBlockNumber={currentBlockNumber}
+                      onCollect={handleCollectFromReveal}
+                    />
+                  </div>
+                )}
 
                 {/* Spacer to push content below fixed elements */}
                 <div style={{ height: "800px" }}></div>

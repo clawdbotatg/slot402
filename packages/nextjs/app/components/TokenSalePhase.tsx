@@ -40,9 +40,9 @@ export function TokenSalePhase() {
   };
 
   // Calculate remaining tokens
-  const tokensRemaining = maxSaleTokens && totalSupply ? Number(formatEther(maxSaleTokens - totalSupply)) : 1500;
+  const tokensRemaining = maxSaleTokens && totalSupply ? Number(formatEther(maxSaleTokens - totalSupply)) : 15;
   const tokensSold = totalSupply ? Number(formatEther(totalSupply)) : 0;
-  const maxTokens = maxSaleTokens ? Number(formatEther(maxSaleTokens)) : 1500;
+  const maxTokens = maxSaleTokens ? Number(formatEther(maxSaleTokens)) : 15;
   const ethRemaining = (tokensRemaining * 0.0001).toFixed(4);
   const progressPercent = ((tokensSold / maxTokens) * 100).toFixed(1);
 
@@ -53,7 +53,8 @@ export function TokenSalePhase() {
         Buy tokens at <span className="font-bold">0.0001 ETH</span> each to fund the slot machine bankroll.
       </p>
       <p className="mb-4 text-sm opacity-80">
-        Target: {maxTokens.toLocaleString()} tokens (0.15 ETH) = 1.65 jackpots + liquidity buffer
+        Target: {maxTokens.toLocaleString()} tokens (0.0015 ETH) = 1.65 jackpots + liquidity buffer (TESTING: 1/100
+        scale)
       </p>
 
       {/* Progress Bar */}
@@ -74,14 +75,14 @@ export function TokenSalePhase() {
         <button className="btn btn-primary btn-sm" onClick={() => handleBuyTokens(1)}>
           Buy 1 (0.0001 ETH)
         </button>
+        <button className="btn btn-primary btn-sm" onClick={() => handleBuyTokens(3)}>
+          Buy 3 (0.0003 ETH)
+        </button>
+        <button className="btn btn-primary btn-sm" onClick={() => handleBuyTokens(5)}>
+          Buy 5 (0.0005 ETH)
+        </button>
         <button className="btn btn-primary btn-sm" onClick={() => handleBuyTokens(10)}>
           Buy 10 (0.001 ETH)
-        </button>
-        <button className="btn btn-primary btn-sm" onClick={() => handleBuyTokens(100)}>
-          Buy 100 (0.01 ETH)
-        </button>
-        <button className="btn btn-primary btn-sm" onClick={() => handleBuyTokens(500)}>
-          Buy 500 (0.05 ETH)
         </button>
         <button
           className="btn btn-accent btn-lg flex-grow"

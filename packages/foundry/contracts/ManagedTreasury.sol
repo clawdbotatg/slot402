@@ -11,9 +11,10 @@ import "./RugSlotToken.sol";
 abstract contract ManagedTreasury {
     // ============ Constants ============
     
-    uint256 public constant TREASURY_THRESHOLD = 0.135 ether; // Reserve to ensure contract can cover payouts
-    uint256 public constant LIQUIDITY_ETH_AMOUNT = 0.015 ether; // 10% of 0.15 ETH token sale
-    uint256 public constant LIQUIDITY_TOKEN_AMOUNT = 150 * 10**18; // 150 tokens (10% of 1500, at token sale price)
+    // TESTING: All values are 1/100 of normal for live network testing with reduced capital
+    uint256 public constant TREASURY_THRESHOLD = 0.00135 ether; // Reserve to ensure contract can cover payouts (was 0.135)
+    uint256 public constant LIQUIDITY_ETH_AMOUNT = 0.00015 ether; // 10% of 0.0015 ETH token sale (was 0.015)
+    uint256 public constant LIQUIDITY_TOKEN_AMOUNT = 15 * 10**17; // 1.5 tokens: 10% of 15 total (was 150)
     
     address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
     
@@ -39,7 +40,6 @@ abstract contract ManagedTreasury {
     event TokensMinted(uint256 amount);
     event LiquidityAdded(uint256 tokenAmount, uint256 ethAmount);
     event LiquidityRemoved(uint256 tokenAmount, uint256 ethAmount);
-    event SwapSlippageExceeded(string swapType, uint256 amount, uint256 slippagePercent);
     
     // ============ Abstract Requirements ============
     
@@ -88,16 +88,20 @@ abstract contract ManagedTreasury {
     
     /**
      * @dev Mint tokens and sell them for ETH to refill treasury
+     * @param _ethNeeded Amount of ETH needed
      */
-    function _mintAndSellForETH(uint256 /* _ethNeeded */) internal {
+    function _mintAndSellForETH(uint256 _ethNeeded) internal {
         if (uniswapPair == address(0)) {
             return; // No pair yet
         }
         
-        // Mint 1 token at a time and sell it
-        // In practice, we might want to estimate how many tokens we need
-        // For now, mint 1 token (1e18) and sell it
-        uint256 tokensToMint = 1 ether; // 1 token
+        // Calculate how many tokens we need to mint and sell to get _ethNeeded ETH
+        uint256 tokensToMint = _calculateTokensNeededForETH(_ethNeeded);
+        
+        // Add 10% buffer to account for slippage and ensure we get enough
+        tokensToMint = (tokensToMint * 110) / 100;
+        
+        // Mint the tokens
         token.mint(address(this), tokensToMint);
         emit TokensMinted(tokensToMint);
         
@@ -105,46 +109,48 @@ abstract contract ManagedTreasury {
         _swapTokensForETH(tokensToMint);
     }
     
-    // ============ Uniswap Integration ============
-    
     /**
-     * @dev Calculate minimum output amount with slippage tolerance
-     * @param _amountIn Input amount
-     * @param _fromToken Address of input token (use WETH for ETH)
-     * @param _slippagePercent Slippage tolerance (e.g., 2 for 2%, 50 for 50%)
-     * @return minAmountOut Minimum acceptable output amount
+     * @dev Calculate how many tokens need to be sold to get desired ETH amount
+     * @param _ethAmount Desired ETH amount to receive
+     * @return tokensNeeded Amount of tokens needed to sell (capped at 10% of pool)
      */
-    function _getAmountOutMin(
-        uint256 _amountIn,
-        address _fromToken,
-        uint256 _slippagePercent
-    ) internal view returns (uint256 minAmountOut) {
-        if (uniswapPair == address(0)) return 1;
+    function _calculateTokensNeededForETH(uint256 _ethAmount) internal view returns (uint256 tokensNeeded) {
+        if (uniswapPair == address(0)) return 1 ether; // Default to 1 token if no pair
         
         // Get reserves
         (uint112 reserve0, uint112 reserve1,) = IUniswapV2Pair(uniswapPair).getReserves();
         address token0 = IUniswapV2Pair(uniswapPair).token0();
         
-        // Determine which reserve is which
-        (uint256 reserveIn, uint256 reserveOut) = _fromToken == token0 
+        // Determine which reserve is which (we're selling tokens for WETH)
+        (uint256 reserveToken, uint256 reserveWETH) = address(token) == token0 
             ? (uint256(reserve0), uint256(reserve1))
             : (uint256(reserve1), uint256(reserve0));
         
-        // Uniswap V2 formula: amountOut = (amountIn * 997 * reserveOut) / (reserveIn * 1000 + amountIn * 997)
+        // Calculate max tokens we should sell (10% of pool reserve)
+        uint256 maxTokensToSell = (reserveToken * 10) / 100;
+        
+        // Check if we have enough liquidity
+        if (reserveWETH <= _ethAmount) {
+            // Not enough liquidity, cap at 90% of reserve
+            _ethAmount = (reserveWETH * 90) / 100;
+        }
+        
+        // Uniswap V2 formula (solving for amountIn given amountOut):
+        // amountIn = (reserveIn * amountOut * 1000) / ((reserveOut - amountOut) * 997) + 1
         // The 997/1000 accounts for the 0.3% fee
-        uint256 amountInWithFee = _amountIn * 997;
-        uint256 numerator = amountInWithFee * reserveOut;
-        uint256 denominator = (reserveIn * 1000) + amountInWithFee;
-        uint256 expectedOut = numerator / denominator;
+        uint256 numerator = reserveToken * _ethAmount * 1000;
+        uint256 denominator = (reserveWETH - _ethAmount) * 997;
+        tokensNeeded = (numerator / denominator) + 1;
         
-        // Apply slippage tolerance
-        minAmountOut = (expectedOut * (100 - _slippagePercent)) / 100;
+        // Cap at 10% of pool to prevent excessive price impact
+        if (tokensNeeded > maxTokensToSell) {
+            tokensNeeded = maxTokensToSell;
+        }
         
-        // Ensure at least 1 to avoid zero issues
-        if (minAmountOut == 0) minAmountOut = 1;
-        
-        return minAmountOut;
+        return tokensNeeded;
     }
+    
+    // ============ Uniswap Integration ============
     
     /**
      * @notice Add initial liquidity to Uniswap (owner only, one-time)
@@ -218,7 +224,7 @@ abstract contract ManagedTreasury {
     }
     
     /**
-     * @dev Swap ETH for tokens (for buyback and burn) with progressive slippage protection
+     * @dev Swap ETH for tokens (for buyback and burn)
      * @return amountOut Amount of tokens received
      */
     function _swapETHForTokens(uint256 _ethAmount) internal returns (uint256 amountOut) {
@@ -232,34 +238,7 @@ abstract contract ManagedTreasury {
         path[0] = WETH;
         path[1] = address(token);
         
-        // Progressive slippage: try 2%, 5%, 10%, 50%, then accept any
-        uint256[] memory slippages = new uint256[](4);
-        slippages[0] = 2;
-        slippages[1] = 5;
-        slippages[2] = 10;
-        slippages[3] = 50;
-        
-        for (uint256 i = 0; i < slippages.length; i++) {
-            uint256 minOut = _getAmountOutMin(_ethAmount, WETH, slippages[i]);
-            
-            try IUniswapV2Router(UNISWAP_V2_ROUTER).swapExactTokensForTokens(
-                _ethAmount,
-                minOut,
-                path,
-                address(this),
-                block.timestamp + 300
-            ) returns (uint256[] memory amounts) {
-                return amounts[1];
-            } catch {
-                // Continue to next slippage level
-                if (i == slippages.length - 1) {
-                    // Last attempt failed, emit event
-                    emit SwapSlippageExceeded("ETH->Token", _ethAmount, slippages[i]);
-                }
-            }
-        }
-        
-        // Final fallback: accept any amount
+        // No slippage protection - accept any amount
         try IUniswapV2Router(UNISWAP_V2_ROUTER).swapExactTokensForTokens(
             _ethAmount,
             1,
@@ -275,7 +254,7 @@ abstract contract ManagedTreasury {
     }
     
     /**
-     * @dev Swap tokens for ETH (for emergency treasury refill) with progressive slippage protection
+     * @dev Swap tokens for ETH (for emergency treasury refill)
      * @return amountOut Amount of ETH received
      */
     function _swapTokensForETH(uint256 _tokenAmount) internal returns (uint256 amountOut) {
@@ -288,37 +267,7 @@ abstract contract ManagedTreasury {
         path[0] = address(token);
         path[1] = WETH;
         
-        // Progressive slippage: try 2%, 5%, 10%, 50%, then accept any
-        uint256[] memory slippages = new uint256[](4);
-        slippages[0] = 2;
-        slippages[1] = 5;
-        slippages[2] = 10;
-        slippages[3] = 50;
-        
-        for (uint256 i = 0; i < slippages.length; i++) {
-            uint256 minOut = _getAmountOutMin(_tokenAmount, address(token), slippages[i]);
-            
-            try IUniswapV2Router(UNISWAP_V2_ROUTER).swapExactTokensForTokens(
-                _tokenAmount,
-                minOut,
-                path,
-                address(this),
-                block.timestamp + 300
-            ) returns (uint256[] memory amounts) {
-                // Unwrap WETH to ETH
-                uint256 wethReceived = amounts[1];
-                IWETH(WETH).withdraw(wethReceived);
-                return wethReceived;
-            } catch {
-                // Continue to next slippage level
-                if (i == slippages.length - 1) {
-                    // Last attempt failed, emit event
-                    emit SwapSlippageExceeded("Token->ETH", _tokenAmount, slippages[i]);
-                }
-            }
-        }
-        
-        // Final fallback: accept any amount
+        // No slippage protection - accept any amount
         try IUniswapV2Router(UNISWAP_V2_ROUTER).swapExactTokensForTokens(
             _tokenAmount,
             1,

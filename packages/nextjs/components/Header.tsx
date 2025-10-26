@@ -22,7 +22,7 @@ export const Header = () => {
     functionName: "currentPhase",
   });
 
-  const phaseEmoji = currentPhase === 0 ? "🛒" : currentPhase === 1 ? "🎰" : "❓";
+  const phaseEmoji = currentPhase === 0 ? "🛒" : currentPhase === 1 ? "🎰" : "⚙️";
 
   // Get contract address
   const chainId = targetNetwork.id as keyof typeof deployedContracts;

@@ -1273,31 +1273,6 @@ const deployedContracts = {
         },
         {
           type: "event",
-          name: "SwapSlippageExceeded",
-          inputs: [
-            {
-              name: "swapType",
-              type: "string",
-              indexed: false,
-              internalType: "string",
-            },
-            {
-              name: "amount",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-            {
-              name: "slippagePercent",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
           name: "TokensBurned",
           inputs: [
             {
@@ -1385,7 +1360,7 @@ const deployedContracts = {
   },
   31337: {
     RugSlotToken: {
-      address: "0xdb700f00d85ca9da27f840c08abaf833837d8aa4",
+      address: "0xa3f13114029db8dd9cfcbd1bd9d373a855f86cb0",
       abi: [
         {
           type: "constructor",
@@ -1765,10 +1740,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 37360253,
+      deployedOnBlock: 37360285,
     },
     RugSlot: {
-      address: "0xa0e5fa0d4a58b3da57ccc734a591a6b8ba6b7fd1",
+      address: "0x3314c81c9d995b028777570a7d02786bc43e74fa",
       abi: [
         {
           type: "constructor",
@@ -2651,31 +2626,6 @@ const deployedContracts = {
         },
         {
           type: "event",
-          name: "SwapSlippageExceeded",
-          inputs: [
-            {
-              name: "swapType",
-              type: "string",
-              indexed: false,
-              internalType: "string",
-            },
-            {
-              name: "amount",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-            {
-              name: "slippagePercent",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
           name: "TokensBurned",
           inputs: [
             {
@@ -2758,7 +2708,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 37360254,
+      deployedOnBlock: 37360286,
     },
   },
   42161: {
@@ -3640,31 +3590,6 @@ const deployedContracts = {
               type: "uint8",
               indexed: false,
               internalType: "enum SimpleTokenSale.Phase",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
-          name: "SwapSlippageExceeded",
-          inputs: [
-            {
-              name: "swapType",
-              type: "string",
-              indexed: false,
-              internalType: "string",
-            },
-            {
-              name: "amount",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-            {
-              name: "slippagePercent",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
             },
           ],
           anonymous: false,
