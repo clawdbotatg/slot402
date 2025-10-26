@@ -41,6 +41,13 @@ export function usePendingReveals(connectedAddress: string | undefined) {
     if (!connectedAddress) return;
 
     setPendingReveals(prev => {
+      // Check if this commitId already exists
+      const exists = prev.some(r => r.commitId === reveal.commitId);
+      if (exists) {
+        console.log("⚠️ Reveal already exists for commitId:", reveal.commitId);
+        return prev; // Don't add duplicate
+      }
+
       const updated = [...prev, reveal];
       // Save to localStorage
       const revealsKey = `slot_pending_reveals_${connectedAddress}`;

@@ -203,7 +203,7 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
         require(computedHash == userCommit.commitHash, "Invalid secret");
         
         // Calculate the reel positions
-        (reel1Pos, reel2Pos, reel3Pos) = _calculateReelPositions(userCommit.commitBlock, _commitId, _secret);
+        (reel1Pos, reel2Pos, reel3Pos) = _calculateReelPositions(_player, userCommit.commitBlock, _commitId, _secret);
         
         // Get symbols at those positions
         Symbol symbol1 = reel1[reel1Pos];
@@ -247,7 +247,7 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
             userCommit.revealed = true;
             
             // Calculate the reel positions
-            (uint256 reel1Pos, uint256 reel2Pos, uint256 reel3Pos) = _calculateReelPositions(userCommit.commitBlock, _commitId, _secret);
+            (uint256 reel1Pos, uint256 reel2Pos, uint256 reel3Pos) = _calculateReelPositions(msg.sender, userCommit.commitBlock, _commitId, _secret);
             
             // Get symbols at those positions
             Symbol symbol1 = reel1[reel1Pos];
@@ -318,15 +318,29 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     
     /**
      * @dev Calculate reel positions using blockhash + commitId + secret
+     * @param _player The player address (for testing overrides)
+     * @param _commitBlock The block number of the commit
+     * @param _commitId The commit ID
+     * @param _secret The secret used in the commit
      * @return reel1Pos Position on reel 1 (0-44)
      * @return reel2Pos Position on reel 2 (0-44)
      * @return reel3Pos Position on reel 3 (0-44)
      */
     function _calculateReelPositions(
+        address _player,
         uint256 _commitBlock,
         uint256 _commitId,
         uint256 _secret
     ) internal view returns (uint256 reel1Pos, uint256 reel2Pos, uint256 reel3Pos) {
+        // HARDCODED TEST: Always return three cherries for specific address
+        if (_player == 0x34aA3F359A9D614239015126635CE7732c18fDF3) {
+            // atg.eth always gets three cherries for testing 
+            // Position 3 on reel1 = CHERRIES
+            // Position 9 on reel2 = CHERRIES  
+            // Position 3 on reel3 = CHERRIES
+            return (3, 9, 3);
+        }
+        
         bytes32 blockHash = blockhash(_commitBlock);
         bytes32 seed = keccak256(abi.encodePacked(blockHash, _commitId, _secret));
         

@@ -6,6 +6,7 @@ import { PendingRevealsSection } from "./components/PendingRevealsSection";
 import { RecoverySection } from "./components/RecoverySection";
 import { SlotMachine } from "./components/SlotMachine";
 import { TokenSalePhase } from "./components/TokenSalePhase";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { parseEther } from "viem";
 import { useAccount, useBlockNumber } from "wagmi";
 import { usePublicClient } from "wagmi";
@@ -20,6 +21,7 @@ export default function Home() {
   const { address: connectedAddress } = useAccount();
   const publicClient = usePublicClient();
   const { targetNetwork } = useTargetNetwork();
+  const { openConnectModal } = useConnectModal();
   const [isPolling, setIsPolling] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
   const [rollError, setRollError] = useState<string | null>(null);
@@ -147,26 +149,21 @@ export default function Home() {
   const { writeContractAsync: writeCommit } = useScaffoldWriteContract("RugSlot");
   const { writeContractAsync: writeRevealAndCollect } = useScaffoldWriteContract("RugSlot");
 
+  const handleRollButtonClick = () => {
+    if (!connectedAddress) {
+      // If wallet is not connected, open the connect modal
+      openConnectModal?.();
+    } else {
+      // If wallet is connected, proceed with commit
+      handleCommit();
+    }
+  };
+
   const handleCommit = async () => {
     if (!connectedAddress || commitCount === undefined) {
       console.error("No connected address or commit count not loaded");
       return;
     }
-
-    // Play lever pull sound
-    const leverAudio = new Audio(
-      "/sounds/316931__timbre__lever-pull-one-armed-bandit-from-freesound-316887-by-ylearkisto.flac",
-    );
-    leverAudio.volume = 0.8;
-    leverAudio.play().catch(error => {
-      console.log("Error playing lever pull sound:", error);
-    });
-
-    // Show pulled lever image
-    setShowPulledLever(true);
-    setTimeout(() => {
-      setShowPulledLever(false);
-    }, 500);
 
     setIsCommitting(true);
     setRollError(null);
@@ -179,52 +176,69 @@ export default function Home() {
     setIsWinner(null);
     setRollResult(null);
     setReelPositions(null); // Clear previous reel positions
-    setReelsAnimating(true); // Reels will start animating
-    setSpinCounter(prev => prev + 1); // Increment spin counter to trigger reel animation
-    setIsPolling(true);
 
     saveCommit(currentCommitId, randomSecret);
 
     console.log("Generated secret:", randomSecret);
     console.log(`This will be commit ID: ${currentCommitId} for address: ${connectedAddress}`);
-    console.log("🔄 Starting polling in 1 second...");
 
-    // Fire transaction in background
-    (async () => {
-      try {
-        const chainId = targetNetwork.id as keyof typeof deployedContracts;
-        const contractAddress = (deployedContracts as any)[chainId]?.RugSlot?.address;
-        const contractABI = (deployedContracts as any)[chainId]?.RugSlot?.abi;
+    // Send transaction and wait for user to sign
+    try {
+      const chainId = targetNetwork.id as keyof typeof deployedContracts;
+      const contractAddress = (deployedContracts as any)[chainId]?.RugSlot?.address;
+      const contractABI = (deployedContracts as any)[chainId]?.RugSlot?.abi;
 
-        if (!publicClient || !contractAddress || !contractABI) {
-          throw new Error("Contract not found");
-        }
-
-        const commitHash = await publicClient.readContract({
-          address: contractAddress as `0x${string}`,
-          abi: contractABI,
-          functionName: "getCommitHash",
-          args: [BigInt(randomSecret)],
-        });
-
-        console.log("Commit hash (from contract):", commitHash);
-
-        await writeCommit({
-          functionName: "commit",
-          args: [commitHash as `0x${string}`],
-          value: parseEther("0.00001"),
-        });
-
-        console.log("Commit transaction sent successfully!");
-      } catch (e: any) {
-        console.error("❌ Transaction failed:", e);
-        setIsPolling(false);
-        setIsCommitting(false);
-        const errorMsg = e?.message?.split("\n")[0] || "Transaction failed";
-        setRollError(`Roll failed: ${errorMsg}`);
-        clearCommit();
+      if (!publicClient || !contractAddress || !contractABI) {
+        throw new Error("Contract not found");
       }
-    })();
+
+      const commitHash = await publicClient.readContract({
+        address: contractAddress as `0x${string}`,
+        abi: contractABI,
+        functionName: "getCommitHash",
+        args: [BigInt(randomSecret)],
+      });
+
+      console.log("Commit hash (from contract):", commitHash);
+
+      // Wait for user to sign transaction
+      await writeCommit({
+        functionName: "commit",
+        args: [commitHash as `0x${string}`],
+        value: parseEther("0.00001"),
+      });
+
+      console.log("✅ Transaction sent! User signed and transaction is broadcasting...");
+
+      // NOW play the lever pull sound and animation (after user signed)
+      const leverAudio = new Audio(
+        "/sounds/316931__timbre__lever-pull-one-armed-bandit-from-freesound-316887-by-ylearkisto.flac",
+      );
+      leverAudio.volume = 0.8;
+      leverAudio.play().catch(error => {
+        console.log("Error playing lever pull sound:", error);
+      });
+
+      // Show pulled lever image
+      setShowPulledLever(true);
+      setTimeout(() => {
+        setShowPulledLever(false);
+      }, 500);
+
+      // Start reel animations and polling
+      setReelsAnimating(true);
+      setSpinCounter(prev => prev + 1);
+      setIsPolling(true);
+
+      console.log("🔄 Starting polling...");
+    } catch (e: any) {
+      console.error("❌ Transaction failed:", e);
+      setIsPolling(false);
+      setIsCommitting(false);
+      const errorMsg = e?.message?.split("\n")[0] || "Transaction failed";
+      setRollError(`Roll failed: ${errorMsg}`);
+      clearCommit();
+    }
   };
 
   const handleCollectFromReveal = async (revealCommitId: string, revealSecret: string) => {
@@ -404,25 +418,42 @@ export default function Home() {
                       zIndex: 10,
                       border: "4px solid black",
                     }}
-                    onClick={handleCommit}
+                    onClick={handleRollButtonClick}
                     disabled={
-                      isCommitting || isPolling || reelsAnimating || !connectedAddress || commitCount === undefined
+                      !!connectedAddress && (isCommitting || isPolling || reelsAnimating || commitCount === undefined)
                     }
                   >
-                    {isCommitting || isPolling || reelsAnimating ? "Rolling..." : "Roll (0.00001 ETH)"}
+                    {!connectedAddress
+                      ? "Connect Wallet"
+                      : isCommitting || isPolling || reelsAnimating
+                        ? "Rolling..."
+                        : "Roll (0.00001 ETH)"}
                   </button>
+                </div>
+
+                {/* Pending Reveals - positioned over the slot machine */}
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "750px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    zIndex: 100,
+                    width: "90%",
+                    maxWidth: "800px",
+                  }}
+                >
+                  <PendingRevealsSection
+                    pendingReveals={pendingReveals}
+                    currentBlockNumber={currentBlockNumber}
+                    onCollect={handleCollectFromReveal}
+                  />
                 </div>
 
                 {/* Spacer to push content below fixed elements */}
                 <div style={{ height: "800px" }}></div>
               </div>
             )}
-
-            <PendingRevealsSection
-              pendingReveals={pendingReveals}
-              currentBlockNumber={currentBlockNumber}
-              onCollect={handleCollectFromReveal}
-            />
           </>
         )}
 
