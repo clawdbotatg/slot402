@@ -11,9 +11,9 @@ import "./RugSlotToken.sol";
 abstract contract ManagedTreasury {
     // ============ Constants ============
     
-    uint256 public constant TREASURY_THRESHOLD = 0.05028480 ether; // 1 jackpot (SEVEN: 5028x * 0.00001 ETH)
-    uint256 public constant LIQUIDITY_ETH_AMOUNT = 0.0025 ether;
-    uint256 public constant LIQUIDITY_TOKEN_AMOUNT = 25 * 10**18; // 25 tokens
+    uint256 public constant TREASURY_THRESHOLD = 0.135 ether; // Reserve to ensure contract can cover payouts
+    uint256 public constant LIQUIDITY_ETH_AMOUNT = 0.015 ether; // 10% of 0.15 ETH token sale
+    uint256 public constant LIQUIDITY_TOKEN_AMOUNT = 150 * 10**18; // 150 tokens (10% of 1500, at token sale price)
     
     address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
     

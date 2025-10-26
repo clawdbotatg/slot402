@@ -63,7 +63,7 @@
 - ✅ Logs contract address and initial state
 - ✅ Ready for local and Arbitrum deployment
 
-### 4. Frontend UI (`packages/nextjs/app/slots/page.tsx`)
+### 4. Frontend UI (`packages/nextjs/app/prototype/page.tsx`)
 
 **Features**:
 
@@ -136,7 +136,7 @@ struct Commit {
 1. Start local chain: `yarn chain`
 2. Deploy contract: `forge script script/DeploySlotMachine.s.sol --rpc-url http://localhost:8545 --broadcast`
 3. Start frontend: `yarn start`
-4. Navigate to `http://localhost:3000/slots`
+4. Navigate to `http://localhost:3000/prototype`
 5. Test token sale → gambling flow
 
 ### For Arbitrum Testing
@@ -183,7 +183,7 @@ struct Commit {
 
 ### Frontend
 
-- `packages/nextjs/app/slots/page.tsx` (NEW)
+- `packages/nextjs/app/prototype/page.tsx` (NEW)
 - `packages/nextjs/components/Header.tsx` (MODIFIED - added slots link)
 
 ### Documentation

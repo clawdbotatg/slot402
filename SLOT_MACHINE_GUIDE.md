@@ -223,7 +223,7 @@ event CommitForfeited(address indexed player, uint256 indexed commitId);
 
 ## Frontend Usage
 
-Navigate to `http://localhost:3000/slots` to:
+Navigate to `http://localhost:3000/prototype` to:
 
 1. Buy tokens during SALE phase
 2. Commit bets during ACTIVE phase

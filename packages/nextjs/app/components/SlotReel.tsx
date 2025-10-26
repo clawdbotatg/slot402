@@ -297,7 +297,7 @@ const SlotReel = memo(function SlotReel({
     <div className="flex flex-col items-center gap-2">
       {/* Reel container */}
       <div
-        className="relative border-4 border-primary rounded-lg"
+        className="relative rounded-lg"
         style={{
           width: "200px",
           height: "300px",

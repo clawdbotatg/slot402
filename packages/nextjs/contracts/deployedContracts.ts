@@ -500,6 +500,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "PAYOUT_BASEETH",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "PAYOUT_BELL",
           inputs: [],
           outputs: [
@@ -514,19 +527,6 @@ const deployedContracts = {
         {
           type: "function",
           name: "PAYOUT_CHERRIES",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "PAYOUT_DIAMOND",
           inputs: [],
           outputs: [
             {
@@ -579,6 +579,19 @@ const deployedContracts = {
         {
           type: "function",
           name: "PAYOUT_STAR",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "PAYOUT_WATERMELON",
           inputs: [],
           outputs: [
             {
@@ -815,8 +828,8 @@ const deployedContracts = {
           outputs: [
             {
               name: "symbolPayouts",
-              type: "uint256[8]",
-              internalType: "uint256[8]",
+              type: "uint256[9]",
+              internalType: "uint256[9]",
             },
             {
               name: "anybarPayout",
@@ -833,8 +846,8 @@ const deployedContracts = {
           outputs: [
             {
               name: "",
-              type: "uint8[36]",
-              internalType: "enum RugSlot.Symbol[36]",
+              type: "uint8[45]",
+              internalType: "enum RugSlot.Symbol[45]",
             },
           ],
           stateMutability: "view",
@@ -846,8 +859,8 @@ const deployedContracts = {
           outputs: [
             {
               name: "",
-              type: "uint8[36]",
-              internalType: "enum RugSlot.Symbol[36]",
+              type: "uint8[45]",
+              internalType: "enum RugSlot.Symbol[45]",
             },
           ],
           stateMutability: "view",
@@ -859,8 +872,8 @@ const deployedContracts = {
           outputs: [
             {
               name: "",
-              type: "uint8[36]",
-              internalType: "enum RugSlot.Symbol[36]",
+              type: "uint8[45]",
+              internalType: "enum RugSlot.Symbol[45]",
             },
           ],
           stateMutability: "view",
@@ -1372,7 +1385,7 @@ const deployedContracts = {
   },
   31337: {
     RugSlotToken: {
-      address: "0x6379ebd504941f50d5bfde9348b37593bd29c835",
+      address: "0x0ab8209491fc251dc829109234931d105ab1d6b8",
       abi: [
         {
           type: "constructor",
@@ -1752,10 +1765,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 86,
+      deployedOnBlock: 37360198,
     },
     RugSlot: {
-      address: "0x5b3120d0da5fdcba7aef87a9c3c64829c1c0d76b",
+      address: "0x67d7fcec828dd0e344fb0d37ae937cda9344e43a",
       abi: [
         {
           type: "constructor",
@@ -1865,6 +1878,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "PAYOUT_BASEETH",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "PAYOUT_BELL",
           inputs: [],
           outputs: [
@@ -1879,19 +1905,6 @@ const deployedContracts = {
         {
           type: "function",
           name: "PAYOUT_CHERRIES",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "PAYOUT_DIAMOND",
           inputs: [],
           outputs: [
             {
@@ -1944,6 +1957,19 @@ const deployedContracts = {
         {
           type: "function",
           name: "PAYOUT_STAR",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "PAYOUT_WATERMELON",
           inputs: [],
           outputs: [
             {
@@ -2180,8 +2206,8 @@ const deployedContracts = {
           outputs: [
             {
               name: "symbolPayouts",
-              type: "uint256[8]",
-              internalType: "uint256[8]",
+              type: "uint256[9]",
+              internalType: "uint256[9]",
             },
             {
               name: "anybarPayout",
@@ -2198,8 +2224,8 @@ const deployedContracts = {
           outputs: [
             {
               name: "",
-              type: "uint8[36]",
-              internalType: "enum RugSlot.Symbol[36]",
+              type: "uint8[45]",
+              internalType: "enum RugSlot.Symbol[45]",
             },
           ],
           stateMutability: "view",
@@ -2211,8 +2237,8 @@ const deployedContracts = {
           outputs: [
             {
               name: "",
-              type: "uint8[36]",
-              internalType: "enum RugSlot.Symbol[36]",
+              type: "uint8[45]",
+              internalType: "enum RugSlot.Symbol[45]",
             },
           ],
           stateMutability: "view",
@@ -2224,8 +2250,8 @@ const deployedContracts = {
           outputs: [
             {
               name: "",
-              type: "uint8[36]",
-              internalType: "enum RugSlot.Symbol[36]",
+              type: "uint8[45]",
+              internalType: "enum RugSlot.Symbol[45]",
             },
           ],
           stateMutability: "view",
@@ -2732,7 +2758,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 87,
+      deployedOnBlock: 37360199,
     },
   },
   42161: {
@@ -2847,6 +2873,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "PAYOUT_BASEETH",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "PAYOUT_BELL",
           inputs: [],
           outputs: [
@@ -2861,19 +2900,6 @@ const deployedContracts = {
         {
           type: "function",
           name: "PAYOUT_CHERRIES",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "PAYOUT_DIAMOND",
           inputs: [],
           outputs: [
             {
@@ -2926,6 +2952,19 @@ const deployedContracts = {
         {
           type: "function",
           name: "PAYOUT_STAR",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "PAYOUT_WATERMELON",
           inputs: [],
           outputs: [
             {
@@ -3162,8 +3201,8 @@ const deployedContracts = {
           outputs: [
             {
               name: "symbolPayouts",
-              type: "uint256[8]",
-              internalType: "uint256[8]",
+              type: "uint256[9]",
+              internalType: "uint256[9]",
             },
             {
               name: "anybarPayout",
@@ -3180,8 +3219,8 @@ const deployedContracts = {
           outputs: [
             {
               name: "",
-              type: "uint8[36]",
-              internalType: "enum RugSlot.Symbol[36]",
+              type: "uint8[45]",
+              internalType: "enum RugSlot.Symbol[45]",
             },
           ],
           stateMutability: "view",
@@ -3193,8 +3232,8 @@ const deployedContracts = {
           outputs: [
             {
               name: "",
-              type: "uint8[36]",
-              internalType: "enum RugSlot.Symbol[36]",
+              type: "uint8[45]",
+              internalType: "enum RugSlot.Symbol[45]",
             },
           ],
           stateMutability: "view",
@@ -3206,8 +3245,8 @@ const deployedContracts = {
           outputs: [
             {
               name: "",
-              type: "uint8[36]",
-              internalType: "enum RugSlot.Symbol[36]",
+              type: "uint8[45]",
+              internalType: "enum RugSlot.Symbol[45]",
             },
           ],
           stateMutability: "view",

@@ -88,8 +88,13 @@
     margin: 1rem 0;
   }
 
+  html {
+    background-color: #1c3d45 !important;
+  }
+
   body {
     min-height: 100vh;
+    background-color: #1c3d45 !important;
   }
 
   h1,
@@ -103,7 +108,7 @@
 
 :root,
 [data-theme] {
-  background: var(--color-base-200);
+  background: #1c3d45 !important;
 }
 
 .btn {

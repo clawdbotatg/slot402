@@ -14,7 +14,7 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     
     // ============ Enums ============
     
-    enum Symbol { CHERRIES, ORANGE, STAR, BELL, DIAMOND, BAR, DOUBLEBAR, SEVEN }
+    enum Symbol { CHERRIES, ORANGE, WATERMELON, STAR, BELL, BAR, DOUBLEBAR, SEVEN, BASEETH }
     
     // ============ Structs ============
     
@@ -32,24 +32,25 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     uint256 public constant MAX_BLOCKS_FOR_REVEAL = 256;
     
     // Payout multipliers for each symbol type
-    uint256 public constant PAYOUT_CHERRIES = 10;
-    uint256 public constant PAYOUT_ORANGE = 15;
-    uint256 public constant PAYOUT_STAR = 23;
-    uint256 public constant PAYOUT_BELL = 40;
-    uint256 public constant PAYOUT_ANYBAR = 56;
-    uint256 public constant PAYOUT_DIAMOND = 79;
-    uint256 public constant PAYOUT_BAR = 186;
-    uint256 public constant PAYOUT_DOUBLEBAR = 629;
-    uint256 public constant PAYOUT_SEVEN = 5028;
+    uint256 public constant PAYOUT_CHERRIES = 12;
+    uint256 public constant PAYOUT_ORANGE = 17;
+    uint256 public constant PAYOUT_WATERMELON = 26;
+    uint256 public constant PAYOUT_STAR = 41;
+    uint256 public constant PAYOUT_BELL = 71;
+    uint256 public constant PAYOUT_ANYBAR = 35;
+    uint256 public constant PAYOUT_BAR = 138;
+    uint256 public constant PAYOUT_DOUBLEBAR = 327;
+    uint256 public constant PAYOUT_SEVEN = 1105;
+    uint256 public constant PAYOUT_BASEETH = 8839;
     
     address private _owner;
     
     // ============ Reel Configurations ============
-    // Each reel has 36 symbols: 8 cherries, 7 oranges, 6 stars, 5 bells, 4 diamonds, 3 bars, 2 doublebars, 1 seven
+    // Each reel has 45 symbols: 9 cherries, 8 oranges, 7 watermelons, 6 stars, 5 bells, 4 bars, 3 doublebars, 2 sevens, 1 baseeth
     
-    Symbol[36] public reel1;
-    Symbol[36] public reel2;
-    Symbol[36] public reel3;
+    Symbol[45] public reel1;
+    Symbol[45] public reel2;
+    Symbol[45] public reel3;
     
     // ============ State Variables ============
     
@@ -80,43 +81,52 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     // ============ Constructor ============
     
     constructor(address _tokenAddress) 
-        SimpleTokenSale(_tokenAddress, 0.0001 ether, 530 * 10**18)
+        SimpleTokenSale(_tokenAddress, 0.0001 ether, 1500 * 10**18)
         ManagedTreasury(_tokenAddress) 
     {
         _owner = 0x05937Df8ca0636505d92Fd769d303A3D461587ed;
         
-        // Initialize Reel 1: 8 cherries, 7 oranges, 6 stars, 5 bells, 4 diamonds, 3 bars, 2 doublebars, 1 seven
-        reel1[0] = Symbol.BAR; reel1[1] = Symbol.DIAMOND; reel1[2] = Symbol.BELL; reel1[3] = Symbol.CHERRIES;
+        // Initialize Reel 1: 9 cherries, 8 oranges, 7 watermelons, 6 stars, 5 bells, 4 bars, 3 doublebars, 2 sevens, 1 baseeth
+        reel1[0] = Symbol.BAR; reel1[1] = Symbol.SEVEN; reel1[2] = Symbol.BELL; reel1[3] = Symbol.CHERRIES;
         reel1[4] = Symbol.ORANGE; reel1[5] = Symbol.STAR; reel1[6] = Symbol.CHERRIES; reel1[7] = Symbol.ORANGE;
-        reel1[8] = Symbol.STAR; reel1[9] = Symbol.DIAMOND; reel1[10] = Symbol.CHERRIES; reel1[11] = Symbol.BELL;
+        reel1[8] = Symbol.STAR; reel1[9] = Symbol.WATERMELON; reel1[10] = Symbol.CHERRIES; reel1[11] = Symbol.BELL;
         reel1[12] = Symbol.ORANGE; reel1[13] = Symbol.STAR; reel1[14] = Symbol.DOUBLEBAR; reel1[15] = Symbol.CHERRIES;
-        reel1[16] = Symbol.SEVEN; reel1[17] = Symbol.ORANGE; reel1[18] = Symbol.STAR; reel1[19] = Symbol.BELL;
-        reel1[20] = Symbol.CHERRIES; reel1[21] = Symbol.BAR; reel1[22] = Symbol.STAR; reel1[23] = Symbol.DIAMOND;
+        reel1[16] = Symbol.WATERMELON; reel1[17] = Symbol.ORANGE; reel1[18] = Symbol.STAR; reel1[19] = Symbol.BELL;
+        reel1[20] = Symbol.CHERRIES; reel1[21] = Symbol.BAR; reel1[22] = Symbol.STAR; reel1[23] = Symbol.WATERMELON;
         reel1[24] = Symbol.ORANGE; reel1[25] = Symbol.BELL; reel1[26] = Symbol.CHERRIES; reel1[27] = Symbol.DOUBLEBAR;
-        reel1[28] = Symbol.STAR; reel1[29] = Symbol.DIAMOND; reel1[30] = Symbol.BAR; reel1[31] = Symbol.BELL;
+        reel1[28] = Symbol.STAR; reel1[29] = Symbol.WATERMELON; reel1[30] = Symbol.BAR; reel1[31] = Symbol.BELL;
         reel1[32] = Symbol.CHERRIES; reel1[33] = Symbol.ORANGE; reel1[34] = Symbol.CHERRIES; reel1[35] = Symbol.ORANGE;
+        reel1[36] = Symbol.WATERMELON; reel1[37] = Symbol.SEVEN; reel1[38] = Symbol.BASEETH; reel1[39] = Symbol.BAR;
+        reel1[40] = Symbol.ORANGE; reel1[41] = Symbol.CHERRIES; reel1[42] = Symbol.WATERMELON; reel1[43] = Symbol.DOUBLEBAR;
+        reel1[44] = Symbol.WATERMELON;
         
-        // Initialize Reel 2: 8 cherries, 7 oranges, 6 stars, 5 bells, 4 diamonds, 3 bars, 2 doublebars, 1 seven
-        reel2[0] = Symbol.STAR; reel2[1] = Symbol.DOUBLEBAR; reel2[2] = Symbol.DIAMOND; reel2[3] = Symbol.ORANGE;
-        reel2[4] = Symbol.CHERRIES; reel2[5] = Symbol.BELL; reel2[6] = Symbol.ORANGE; reel2[7] = Symbol.STAR;
+        // Initialize Reel 2: 9 cherries, 8 oranges, 7 watermelons, 6 stars, 5 bells, 4 bars, 3 doublebars, 2 sevens, 1 baseeth
+        reel2[0] = Symbol.STAR; reel2[1] = Symbol.DOUBLEBAR; reel2[2] = Symbol.WATERMELON; reel2[3] = Symbol.ORANGE;
+        reel2[4] = Symbol.BASEETH; reel2[5] = Symbol.BELL; reel2[6] = Symbol.ORANGE; reel2[7] = Symbol.STAR;
         reel2[8] = Symbol.BAR; reel2[9] = Symbol.CHERRIES; reel2[10] = Symbol.ORANGE; reel2[11] = Symbol.BELL;
-        reel2[12] = Symbol.STAR; reel2[13] = Symbol.DIAMOND; reel2[14] = Symbol.CHERRIES; reel2[15] = Symbol.ORANGE;
+        reel2[12] = Symbol.STAR; reel2[13] = Symbol.WATERMELON; reel2[14] = Symbol.CHERRIES; reel2[15] = Symbol.ORANGE;
         reel2[16] = Symbol.BELL; reel2[17] = Symbol.STAR; reel2[18] = Symbol.SEVEN; reel2[19] = Symbol.BAR;
-        reel2[20] = Symbol.DIAMOND; reel2[21] = Symbol.ORANGE; reel2[22] = Symbol.CHERRIES; reel2[23] = Symbol.STAR;
-        reel2[24] = Symbol.BELL; reel2[25] = Symbol.DOUBLEBAR; reel2[26] = Symbol.ORANGE; reel2[27] = Symbol.DIAMOND;
+        reel2[20] = Symbol.WATERMELON; reel2[21] = Symbol.ORANGE; reel2[22] = Symbol.CHERRIES; reel2[23] = Symbol.STAR;
+        reel2[24] = Symbol.BELL; reel2[25] = Symbol.DOUBLEBAR; reel2[26] = Symbol.ORANGE; reel2[27] = Symbol.WATERMELON;
         reel2[28] = Symbol.BAR; reel2[29] = Symbol.CHERRIES; reel2[30] = Symbol.STAR; reel2[31] = Symbol.BELL;
         reel2[32] = Symbol.CHERRIES; reel2[33] = Symbol.ORANGE; reel2[34] = Symbol.CHERRIES; reel2[35] = Symbol.ORANGE;
+        reel2[36] = Symbol.WATERMELON; reel2[37] = Symbol.SEVEN; reel2[38] = Symbol.WATERMELON; reel2[39] = Symbol.BAR;
+        reel2[40] = Symbol.CHERRIES; reel2[41] = Symbol.DOUBLEBAR; reel2[42] = Symbol.CHERRIES; reel2[43] = Symbol.WATERMELON;
+        reel2[44] = Symbol.CHERRIES;
         
-        // Initialize Reel 3: 8 cherries, 7 oranges, 6 stars, 5 bells, 4 diamonds, 3 bars, 2 doublebars, 1 seven
+        // Initialize Reel 3: 9 cherries, 8 oranges, 7 watermelons, 6 stars, 5 bells, 4 bars, 3 doublebars, 2 sevens, 1 baseeth
         reel3[0] = Symbol.BELL; reel3[1] = Symbol.BAR; reel3[2] = Symbol.STAR; reel3[3] = Symbol.CHERRIES;
-        reel3[4] = Symbol.ORANGE; reel3[5] = Symbol.DIAMOND; reel3[6] = Symbol.ORANGE; reel3[7] = Symbol.STAR;
+        reel3[4] = Symbol.ORANGE; reel3[5] = Symbol.WATERMELON; reel3[6] = Symbol.ORANGE; reel3[7] = Symbol.STAR;
         reel3[8] = Symbol.ORANGE; reel3[9] = Symbol.BELL; reel3[10] = Symbol.CHERRIES; reel3[11] = Symbol.DOUBLEBAR;
-        reel3[12] = Symbol.STAR; reel3[13] = Symbol.DIAMOND; reel3[14] = Symbol.ORANGE; reel3[15] = Symbol.BELL;
-        reel3[16] = Symbol.CHERRIES; reel3[17] = Symbol.STAR; reel3[18] = Symbol.BAR; reel3[19] = Symbol.DIAMOND;
-        reel3[20] = Symbol.SEVEN; reel3[21] = Symbol.ORANGE; reel3[22] = Symbol.CHERRIES; reel3[23] = Symbol.BELL;
-        reel3[24] = Symbol.STAR; reel3[25] = Symbol.DOUBLEBAR; reel3[26] = Symbol.DIAMOND; reel3[27] = Symbol.ORANGE;
+        reel3[12] = Symbol.STAR; reel3[13] = Symbol.WATERMELON; reel3[14] = Symbol.ORANGE; reel3[15] = Symbol.BELL;
+        reel3[16] = Symbol.CHERRIES; reel3[17] = Symbol.STAR; reel3[18] = Symbol.BAR; reel3[19] = Symbol.WATERMELON;
+        reel3[20] = Symbol.SEVEN; reel3[21] = Symbol.BASEETH; reel3[22] = Symbol.CHERRIES; reel3[23] = Symbol.BELL;
+        reel3[24] = Symbol.STAR; reel3[25] = Symbol.DOUBLEBAR; reel3[26] = Symbol.WATERMELON; reel3[27] = Symbol.ORANGE;
         reel3[28] = Symbol.STAR; reel3[29] = Symbol.BAR; reel3[30] = Symbol.CHERRIES; reel3[31] = Symbol.BELL;
         reel3[32] = Symbol.CHERRIES; reel3[33] = Symbol.ORANGE; reel3[34] = Symbol.CHERRIES; reel3[35] = Symbol.CHERRIES;
+        reel3[36] = Symbol.WATERMELON; reel3[37] = Symbol.SEVEN; reel3[38] = Symbol.WATERMELON; reel3[39] = Symbol.BAR;
+        reel3[40] = Symbol.ORANGE; reel3[41] = Symbol.CHERRIES; reel3[42] = Symbol.WATERMELON; reel3[43] = Symbol.DOUBLEBAR;
+        reel3[44] = Symbol.ORANGE;
     }
     
     // ============ Commit-Reveal Gambling Functions ============
@@ -176,9 +186,9 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
      * @param _commitId The commit ID to check
      * @param _secret The secret number used in the original commit
      * @return won True if this is a winning commit (all 3 reels match)
-     * @return reel1Pos Position on reel 1 (0-35)
-     * @return reel2Pos Position on reel 2 (0-35)
-     * @return reel3Pos Position on reel 3 (0-35)
+     * @return reel1Pos Position on reel 1 (0-44)
+     * @return reel2Pos Position on reel 2 (0-44)
+     * @return reel3Pos Position on reel 3 (0-44)
      * @return payout Amount won (10x bet if match, 0 otherwise)
      */
     function isWinner(address _player, uint256 _commitId, uint256 _secret) 
@@ -308,9 +318,9 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     
     /**
      * @dev Calculate reel positions using blockhash + commitId + secret
-     * @return reel1Pos Position on reel 1 (0-35)
-     * @return reel2Pos Position on reel 2 (0-35)
-     * @return reel3Pos Position on reel 3 (0-35)
+     * @return reel1Pos Position on reel 1 (0-44)
+     * @return reel2Pos Position on reel 2 (0-44)
+     * @return reel3Pos Position on reel 3 (0-44)
      */
     function _calculateReelPositions(
         uint256 _commitBlock,
@@ -326,28 +336,29 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
         uint256 chunk2 = uint256(bytes32(seed << 80) >> 176); // Middle 10 bytes
         uint256 chunk3 = uint256(bytes32(seed << 160) >> 192); // Last 9 bytes (72 bits), shift right by 192 bits
         
-        // Mod by 36 to get positions
-        reel1Pos = chunk1 % 36;
-        reel2Pos = chunk2 % 36;
-        reel3Pos = chunk3 % 36;
+        // Mod by 45 to get positions
+        reel1Pos = chunk1 % 45;
+        reel2Pos = chunk2 % 45;
+        reel3Pos = chunk3 % 45;
         
         return (reel1Pos, reel2Pos, reel3Pos);
     }
     
     /**
      * @notice Get all payout multipliers for frontend display
-     * @return symbolPayouts Array of multipliers in symbol order [CHERRIES, ORANGE, STAR, BELL, DIAMOND, BAR, DOUBLEBAR, SEVEN]
+     * @return symbolPayouts Array of multipliers in symbol order [CHERRIES, ORANGE, WATERMELON, STAR, BELL, BAR, DOUBLEBAR, SEVEN, BASEETH]
      * @return anybarPayout The ANYBAR special case multiplier
      */
-    function getPayouts() external pure returns (uint256[8] memory symbolPayouts, uint256 anybarPayout) {
+    function getPayouts() external pure returns (uint256[9] memory symbolPayouts, uint256 anybarPayout) {
         symbolPayouts[0] = PAYOUT_CHERRIES;
         symbolPayouts[1] = PAYOUT_ORANGE;
-        symbolPayouts[2] = PAYOUT_STAR;
-        symbolPayouts[3] = PAYOUT_BELL;
-        symbolPayouts[4] = PAYOUT_DIAMOND;
+        symbolPayouts[2] = PAYOUT_WATERMELON;
+        symbolPayouts[3] = PAYOUT_STAR;
+        symbolPayouts[4] = PAYOUT_BELL;
         symbolPayouts[5] = PAYOUT_BAR;
         symbolPayouts[6] = PAYOUT_DOUBLEBAR;
         symbolPayouts[7] = PAYOUT_SEVEN;
+        symbolPayouts[8] = PAYOUT_BASEETH;
         anybarPayout = PAYOUT_ANYBAR;
         return (symbolPayouts, anybarPayout);
     }
@@ -371,18 +382,20 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
                 payout = betSize * PAYOUT_CHERRIES;
             } else if (symbol1 == Symbol.ORANGE) {
                 payout = betSize * PAYOUT_ORANGE;
+            } else if (symbol1 == Symbol.WATERMELON) {
+                payout = betSize * PAYOUT_WATERMELON;
             } else if (symbol1 == Symbol.STAR) {
                 payout = betSize * PAYOUT_STAR;
             } else if (symbol1 == Symbol.BELL) {
                 payout = betSize * PAYOUT_BELL;
-            } else if (symbol1 == Symbol.DIAMOND) {
-                payout = betSize * PAYOUT_DIAMOND;
             } else if (symbol1 == Symbol.BAR) {
                 payout = betSize * PAYOUT_BAR;
             } else if (symbol1 == Symbol.DOUBLEBAR) {
                 payout = betSize * PAYOUT_DOUBLEBAR;
             } else if (symbol1 == Symbol.SEVEN) {
                 payout = betSize * PAYOUT_SEVEN;
+            } else if (symbol1 == Symbol.BASEETH) {
+                payout = betSize * PAYOUT_BASEETH;
             }
             return (hasWon, payout);
         }
@@ -406,36 +419,36 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     
     /**
      * @notice Get all symbols on reel 1
-     * @return Array of 36 symbols
+     * @return Array of 45 symbols
      */
-    function getReel1() external view returns (Symbol[36] memory) {
+    function getReel1() external view returns (Symbol[45] memory) {
         return reel1;
     }
     
     /**
      * @notice Get all symbols on reel 2
-     * @return Array of 36 symbols
+     * @return Array of 45 symbols
      */
-    function getReel2() external view returns (Symbol[36] memory) {
+    function getReel2() external view returns (Symbol[45] memory) {
         return reel2;
     }
     
     /**
      * @notice Get all symbols on reel 3
-     * @return Array of 36 symbols
+     * @return Array of 45 symbols
      */
-    function getReel3() external view returns (Symbol[36] memory) {
+    function getReel3() external view returns (Symbol[45] memory) {
         return reel3;
     }
     
     /**
      * @notice Get symbol at a specific position on a reel
      * @param _reelNum Reel number (1, 2, or 3)
-     * @param _position Position on the reel (0-35)
+     * @param _position Position on the reel (0-44)
      * @return The symbol at that position
      */
     function getSymbolAtPosition(uint8 _reelNum, uint256 _position) external view returns (Symbol) {
-        require(_position < 36, "Invalid position");
+        require(_position < 45, "Invalid position");
         require(_reelNum >= 1 && _reelNum <= 3, "Invalid reel number");
         
         if (_reelNum == 1) return reel1[_position];

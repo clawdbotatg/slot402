@@ -1,7 +1,27 @@
-import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { formatEther } from "viem";
+import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
 export function TokenSalePhase() {
   const { writeContractAsync: writeBuyTokens } = useScaffoldWriteContract("RugSlot");
+
+  // Read max sale tokens
+  const { data: maxSaleTokens } = useScaffoldReadContract({
+    contractName: "RugSlot",
+    functionName: "maxSaleTokens",
+  });
+
+  // Read token address
+  // const { data: tokenAddress } = useScaffoldReadContract({
+  //   contractName: "RugSlot",
+  //   functionName: "sellableToken",
+  // });
+
+  // Read current total supply from the token contract
+  const { data: totalSupply } = useScaffoldReadContract({
+    contractName: "RugSlotToken",
+    functionName: "totalSupply",
+    watch: true,
+  });
 
   const handleBuyTokens = async (amount: number) => {
     try {
@@ -19,22 +39,56 @@ export function TokenSalePhase() {
     }
   };
 
+  // Calculate remaining tokens
+  const tokensRemaining = maxSaleTokens && totalSupply ? Number(formatEther(maxSaleTokens - totalSupply)) : 1500;
+  const tokensSold = totalSupply ? Number(formatEther(totalSupply)) : 0;
+  const maxTokens = maxSaleTokens ? Number(formatEther(maxSaleTokens)) : 1500;
+  const ethRemaining = (tokensRemaining * 0.0001).toFixed(4);
+  const progressPercent = ((tokensSold / maxTokens) * 100).toFixed(1);
+
   return (
     <div className="bg-base-200 rounded-lg p-6 mb-6">
-      <h2 className="text-2xl font-semibold mb-4">Token Sale</h2>
-      <p className="mb-4">Buy tokens at 0.0001 ETH each. Max 530 tokens available.</p>
+      <h2 className="text-2xl font-semibold mb-4">🛒 Token Sale - Crowdfund the Jackpot!</h2>
+      <p className="mb-2">
+        Buy tokens at <span className="font-bold">0.0001 ETH</span> each to fund the slot machine bankroll.
+      </p>
+      <p className="mb-4 text-sm opacity-80">
+        Target: {maxTokens.toLocaleString()} tokens (0.15 ETH) = 1.65 jackpots + liquidity buffer
+      </p>
+
+      {/* Progress Bar */}
+      <div className="mb-4">
+        <div className="flex justify-between text-sm mb-1">
+          <span>
+            {tokensSold.toLocaleString()} / {maxTokens.toLocaleString()} tokens sold
+          </span>
+          <span className="font-bold">{progressPercent}%</span>
+        </div>
+        <progress className="progress progress-primary w-full" value={tokensSold} max={maxTokens}></progress>
+        <p className="text-xs opacity-70 mt-1">
+          Remaining: {tokensRemaining.toLocaleString()} tokens ({ethRemaining} ETH)
+        </p>
+      </div>
+
       <div className="flex flex-wrap gap-2">
-        <button className="btn btn-primary" onClick={() => handleBuyTokens(1)}>
-          Buy 1 Token (0.0001 ETH)
+        <button className="btn btn-primary btn-sm" onClick={() => handleBuyTokens(1)}>
+          Buy 1 (0.0001 ETH)
         </button>
-        <button className="btn btn-primary" onClick={() => handleBuyTokens(10)}>
-          Buy 10 Tokens (0.001 ETH)
+        <button className="btn btn-primary btn-sm" onClick={() => handleBuyTokens(10)}>
+          Buy 10 (0.001 ETH)
         </button>
-        <button className="btn btn-primary" onClick={() => handleBuyTokens(100)}>
-          Buy 100 Tokens (0.01 ETH)
+        <button className="btn btn-primary btn-sm" onClick={() => handleBuyTokens(100)}>
+          Buy 100 (0.01 ETH)
         </button>
-        <button className="btn btn-primary btn-accent" onClick={() => handleBuyTokens(530)}>
-          Buy All 530 Tokens (0.053 ETH)
+        <button className="btn btn-primary btn-sm" onClick={() => handleBuyTokens(500)}>
+          Buy 500 (0.05 ETH)
+        </button>
+        <button
+          className="btn btn-accent btn-lg flex-grow"
+          onClick={() => handleBuyTokens(tokensRemaining)}
+          disabled={tokensRemaining <= 0}
+        >
+          💰 Buy All Remaining ({tokensRemaining.toLocaleString()} tokens = {ethRemaining} ETH)
         </button>
       </div>
     </div>

@@ -6,23 +6,20 @@ import { PendingRevealsSection } from "./components/PendingRevealsSection";
 import { RecoverySection } from "./components/RecoverySection";
 import { SlotMachine } from "./components/SlotMachine";
 import { TokenSalePhase } from "./components/TokenSalePhase";
-import { formatEther, parseEther } from "viem";
+import { parseEther } from "viem";
 import { useAccount, useBlockNumber } from "wagmi";
 import { usePublicClient } from "wagmi";
 import deployedContracts from "~~/contracts/deployedContracts";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth";
-import { useWatchBalance } from "~~/hooks/scaffold-eth";
 import { useCommitPolling } from "~~/hooks/useCommitPolling";
 import { useCommitStorage } from "~~/hooks/useCommitStorage";
 import { usePendingReveals } from "~~/hooks/usePendingReveals";
-import { useGlobalState } from "~~/services/store/store";
 
 export default function Home() {
   const { address: connectedAddress } = useAccount();
   const publicClient = usePublicClient();
   const { targetNetwork } = useTargetNetwork();
-  const nativeCurrencyPrice = useGlobalState(state => state.nativeCurrency.price);
   const [isPolling, setIsPolling] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
   const [rollError, setRollError] = useState<string | null>(null);
@@ -32,18 +29,20 @@ export default function Home() {
   const [reel3Symbols, setReel3Symbols] = useState<string[]>([]);
   const [spinCounter, setSpinCounter] = useState(0);
   const [reelsAnimating, setReelsAnimating] = useState(false);
+  const [showPulledLever, setShowPulledLever] = useState(false);
 
   // Map Symbol enum to image paths
   const symbolToImage = (symbolIndex: number): string => {
     const symbols = [
       "/slot/cherries.png", // 0: CHERRIES
       "/slot/orange.png", // 1: ORANGE
-      "/slot/star.png", // 2: STAR
-      "/slot/bell.png", // 3: BELL
-      "/slot/diamond.png", // 4: DIAMOND
+      "/slot/watermelon.png", // 2: WATERMELON
+      "/slot/star.png", // 3: STAR
+      "/slot/bell.png", // 4: BELL
       "/slot/bar.png", // 5: BAR
       "/slot/doublebar.png", // 6: DOUBLEBAR
       "/slot/seven.png", // 7: SEVEN
+      "/slot/baseeth.png", // 8: BASEETH
     ];
     return symbols[symbolIndex] || "/slot/cherries.png";
   };
@@ -65,15 +64,6 @@ export default function Home() {
 
   // Watch for new blocks
   const { data: currentBlockNumber } = useBlockNumber({ watch: true });
-
-  // Get contract address
-  const chainId = targetNetwork.id as keyof typeof deployedContracts;
-  const contractAddress = (deployedContracts as any)[chainId]?.RugSlot?.address;
-
-  // Watch contract ETH balance
-  const { data: contractEthBalance } = useWatchBalance({
-    address: contractAddress as `0x${string}`,
-  });
 
   // Read contract state
   const { data: currentPhase } = useScaffoldReadContract({
@@ -171,6 +161,12 @@ export default function Home() {
     leverAudio.play().catch(error => {
       console.log("Error playing lever pull sound:", error);
     });
+
+    // Show pulled lever image
+    setShowPulledLever(true);
+    setTimeout(() => {
+      setShowPulledLever(false);
+    }, 500);
 
     setIsCommitting(true);
     setRollError(null);
@@ -300,52 +296,78 @@ export default function Home() {
     console.log("ℹ️  Pending reveals preserved:", pendingReveals.length);
   };
 
-  const phaseEmoji = currentPhase === 0 ? "🛒" : currentPhase === 1 ? "🎰" : "❓";
-
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-8">
+    <div className="flex flex-col items-center justify-center min-h-screen p-8" style={{ backgroundColor: "#1c3d45" }}>
       <div className="max-w-4xl w-full">
-        <h1 className="text-3xl font-bold mb-8 text-center">
-          {phaseEmoji} Slot Machine{" "}
-          {contractEthBalance ? (
-            <span className="text-2xl">
-              {Number(formatEther(contractEthBalance.value)).toFixed(6)} ETH
-              {nativeCurrencyPrice > 0 && (
-                <span className="opacity-60">
-                  {" "}
-                  (${(Number(formatEther(contractEthBalance.value)) * nativeCurrencyPrice).toFixed(2)})
-                </span>
-              )}
-            </span>
-          ) : (
-            <span className="text-2xl">0.000000 ETH</span>
-          )}
-        </h1>
-
         {currentPhase === 0 && <TokenSalePhase />}
 
         {currentPhase === 1 && (
           <>
             {/* Slot Machine */}
             {reel1Symbols.length > 0 && reel2Symbols.length > 0 && reel3Symbols.length > 0 && (
-              <div className="bg-base-200 rounded-lg p-6 mb-6">
-                <SlotMachine
-                  onSpinStart={() => {}}
-                  onAllReelsComplete={() => {
-                    console.log("🎉 All reels animation complete! Button enabled.");
-                    setReelsAnimating(false);
+              <div className="mb-6" style={{ position: "relative" }}>
+                {/* Background image - positioned absolutely under the reels */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/bg/bg.jpg"
+                  alt="Slot machine background"
+                  style={{
+                    position: "absolute",
+                    top: "-20px",
+                    left: "53%",
+                    transform: "translateX(-50%)",
+                    zIndex: 0,
+                    pointerEvents: "none",
+                    width: "1250px",
+                    height: "auto",
+                    maxWidth: "none",
+                    maxHeight: "none",
                   }}
-                  reel1Symbols={reel1Symbols}
-                  reel2Symbols={reel2Symbols}
-                  reel3Symbols={reel3Symbols}
-                  stopPosition1={reelPositions?.reel1 ?? null}
-                  stopPosition2={reelPositions?.reel2 ?? null}
-                  stopPosition3={reelPositions?.reel3 ?? null}
-                  spinCounter={spinCounter}
                 />
+                {/* Pulled lever image - shows briefly when lever is pulled */}
+                {showPulledLever && (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/bg/bgpulled.jpg"
+                      alt="Slot machine lever pulled"
+                      style={{
+                        position: "absolute",
+                        top: "-20px",
+                        left: "53%",
+                        transform: "translateX(-50%)",
+                        zIndex: 1,
+                        pointerEvents: "none",
+                        width: "1250px",
+                        height: "auto",
+                        maxWidth: "none",
+                        maxHeight: "none",
+                      }}
+                    />
+                  </>
+                )}
+                <div style={{ position: "absolute", top: "300px", left: "50%", transform: "translateX(-50%)" }}>
+                  <SlotMachine
+                    onSpinStart={() => {}}
+                    onAllReelsComplete={() => {
+                      console.log("🎉 All reels animation complete! Button enabled.");
+                      setReelsAnimating(false);
+                    }}
+                    reel1Symbols={reel1Symbols}
+                    reel2Symbols={reel2Symbols}
+                    reel3Symbols={reel3Symbols}
+                    stopPosition1={reelPositions?.reel1 ?? null}
+                    stopPosition2={reelPositions?.reel2 ?? null}
+                    stopPosition3={reelPositions?.reel3 ?? null}
+                    spinCounter={spinCounter}
+                  />
+                </div>
 
                 {/* Roll Button */}
-                <div className="flex flex-col items-center gap-4 mt-6">
+                <div
+                  className="flex flex-col items-center gap-4"
+                  style={{ position: "absolute", top: "610px", left: "750px" }}
+                >
                   {rollError && (
                     <div className="alert alert-error w-full max-w-md">
                       <svg
@@ -366,25 +388,33 @@ export default function Home() {
                   )}
 
                   <button
-                    className="btn btn-primary btn-lg px-12"
+                    className="btn btn-primary btn-lg"
+                    style={{
+                      width: "180px",
+                      height: "30px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: "1rem",
+                      borderRadius: "0",
+                      backgroundColor: "red",
+                      fontSize: "14px",
+                      boxShadow: "0 13px 0 0 black",
+                      position: "relative",
+                      zIndex: 10,
+                      border: "4px solid black",
+                    }}
                     onClick={handleCommit}
                     disabled={
                       isCommitting || isPolling || reelsAnimating || !connectedAddress || commitCount === undefined
                     }
                   >
-                    {isCommitting || isPolling || reelsAnimating ? (
-                      "Rolling..."
-                    ) : (
-                      <span>
-                        Roll (0.00001 ETH
-                        {nativeCurrencyPrice > 0 && (
-                          <span className="opacity-70"> ≈ ${(0.00001 * nativeCurrencyPrice).toFixed(4)}</span>
-                        )}
-                        )
-                      </span>
-                    )}
+                    {isCommitting || isPolling || reelsAnimating ? "Rolling..." : "Roll (0.00001 ETH)"}
                   </button>
                 </div>
+
+                {/* Spacer to push content below fixed elements */}
+                <div style={{ height: "800px" }}></div>
               </div>
             )}
 
@@ -396,18 +426,20 @@ export default function Home() {
           </>
         )}
 
-        <OwnerControls connectedAddress={connectedAddress} />
+        <div style={{ marginTop: "500px" }}>
+          <OwnerControls connectedAddress={connectedAddress} />
 
-        <RecoverySection
-          connectedAddress={connectedAddress}
-          isPolling={isPolling}
-          isCommitting={isCommitting}
-          rollError={rollError}
-          commitId={commitId}
-          commitCount={commitCount}
-          pendingRevealsCount={pendingReveals.length}
-          onUnjam={handleUnjam}
-        />
+          <RecoverySection
+            connectedAddress={connectedAddress}
+            isPolling={isPolling}
+            isCommitting={isCommitting}
+            rollError={rollError}
+            commitId={commitId}
+            commitCount={commitCount}
+            pendingRevealsCount={pendingReveals.length}
+            onUnjam={handleUnjam}
+          />
+        </div>
       </div>
     </div>
   );

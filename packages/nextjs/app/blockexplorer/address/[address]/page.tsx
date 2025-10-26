@@ -21,7 +21,7 @@ async function fetchByteCodeAndAssembly(buildInfoDirectory: string, contractPath
 
     const buildInfo = JSON.parse(fs.readFileSync(filePath, "utf8"));
 
-    if (buildInfo.output.contracts[contractPath]) {
+    if (buildInfo.output?.contracts?.[contractPath]) {
       for (const contract in buildInfo.output.contracts[contractPath]) {
         bytecode = buildInfo.output.contracts[contractPath][contract].evm.bytecode.object;
         assembly = buildInfo.output.contracts[contractPath][contract].evm.bytecode.opcodes;
