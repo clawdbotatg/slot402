@@ -228,7 +228,7 @@ contract RugSlotTest is Test {
             assertTrue(revealed);
             
             if (amountWon > 0) {
-                assertEq(amountWon, BET_SIZE * 2);
+                assertEq(amountWon, BET_SIZE * 10);
                 foundWin = true;
             } else {
                 assertEq(amountWon, 0);
@@ -255,16 +255,18 @@ contract RugSlotTest is Test {
         vm.roll(block.number + 1);
         
         // Check isWinner without revealing (don't care if win or loss, just that it works)
-        (bool won, uint256 result) = slot.isWinner(player1, commitId, secret);
+        (bool won, uint256 reel1Pos, uint256 reel2Pos, uint256 reel3Pos, uint256 payout) = slot.isWinner(player1, commitId, secret);
         
-        // Result should be 1-10
-        assertTrue(result >= 1 && result <= 10);
+        // Reel positions should be 0-35
+        assertTrue(reel1Pos < 36);
+        assertTrue(reel2Pos < 36);
+        assertTrue(reel3Pos < 36);
         
-        // Won should match the result
-        if (result >= 1 && result <= 4) {
-            assertTrue(won);
+        // Won should match the payout
+        if (won) {
+            assertTrue(payout > 0);
         } else {
-            assertFalse(won);
+            assertEq(payout, 0);
         }
     }
     
@@ -408,7 +410,7 @@ contract RugSlotTest is Test {
             
             vm.roll(block.number + 1);
             
-            (bool won, ) = slot.isWinner(player1, commitId, secret);
+            (bool won, , , , ) = slot.isWinner(player1, commitId, secret);
             
             if (won) {
                 wins++;
@@ -425,10 +427,10 @@ contract RugSlotTest is Test {
             vm.deal(player1, 100 ether);
         }
         
-        // Win rate should be around 40% (4 in 10)
-        // With 100 trials, we expect around 40 wins, give or take
+        // Win rate should be around 2.8% (matching 3 symbols)
+        // With 100 trials, we expect around 0-10 wins
         console.log("Wins:", wins, "out of", trials);
-        assertTrue(wins >= 25 && wins <= 55, "Win rate outside expected range");
+        assertTrue(wins <= 15, "Win rate outside expected range (should be ~2.8%)");
     }
     
     // ============ Helper Functions ============

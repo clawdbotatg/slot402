@@ -12,6 +12,10 @@ import "./ManagedTreasury.sol";
  */
 contract RugSlot is SimpleTokenSale, ManagedTreasury {
     
+    // ============ Enums ============
+    
+    enum Symbol { CHERRIES, ORANGE, STAR, BELL, DIAMOND, BAR, DOUBLEBAR, SEVEN }
+    
     // ============ Structs ============
     
     struct Commit {
@@ -25,10 +29,27 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     // ============ Constants ============
     
     uint256 public constant BET_SIZE = 0.00001 ether;
-    uint256 public constant PAYOUT_MULTIPLIER = 5;
     uint256 public constant MAX_BLOCKS_FOR_REVEAL = 256;
     
+    // Payout multipliers for each symbol type
+    uint256 public constant PAYOUT_CHERRIES = 10;
+    uint256 public constant PAYOUT_ORANGE = 15;
+    uint256 public constant PAYOUT_STAR = 23;
+    uint256 public constant PAYOUT_BELL = 40;
+    uint256 public constant PAYOUT_ANYBAR = 56;
+    uint256 public constant PAYOUT_DIAMOND = 79;
+    uint256 public constant PAYOUT_BAR = 186;
+    uint256 public constant PAYOUT_DOUBLEBAR = 629;
+    uint256 public constant PAYOUT_SEVEN = 5028;
+    
     address private _owner;
+    
+    // ============ Reel Configurations ============
+    // Each reel has 36 symbols: 8 cherries, 7 oranges, 6 stars, 5 bells, 4 diamonds, 3 bars, 2 doublebars, 1 seven
+    
+    Symbol[36] public reel1;
+    Symbol[36] public reel2;
+    Symbol[36] public reel3;
     
     // ============ State Variables ============
     
@@ -59,10 +80,43 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     // ============ Constructor ============
     
     constructor(address _tokenAddress) 
-        SimpleTokenSale(_tokenAddress, 0.0001 ether, 5 ether)
+        SimpleTokenSale(_tokenAddress, 0.0001 ether, 530 * 10**18)
         ManagedTreasury(_tokenAddress) 
     {
         _owner = 0x05937Df8ca0636505d92Fd769d303A3D461587ed;
+        
+        // Initialize Reel 1: 8 cherries, 7 oranges, 6 stars, 5 bells, 4 diamonds, 3 bars, 2 doublebars, 1 seven
+        reel1[0] = Symbol.BAR; reel1[1] = Symbol.DIAMOND; reel1[2] = Symbol.BELL; reel1[3] = Symbol.CHERRIES;
+        reel1[4] = Symbol.ORANGE; reel1[5] = Symbol.STAR; reel1[6] = Symbol.CHERRIES; reel1[7] = Symbol.ORANGE;
+        reel1[8] = Symbol.STAR; reel1[9] = Symbol.DIAMOND; reel1[10] = Symbol.CHERRIES; reel1[11] = Symbol.BELL;
+        reel1[12] = Symbol.ORANGE; reel1[13] = Symbol.STAR; reel1[14] = Symbol.DOUBLEBAR; reel1[15] = Symbol.CHERRIES;
+        reel1[16] = Symbol.SEVEN; reel1[17] = Symbol.ORANGE; reel1[18] = Symbol.STAR; reel1[19] = Symbol.BELL;
+        reel1[20] = Symbol.CHERRIES; reel1[21] = Symbol.BAR; reel1[22] = Symbol.STAR; reel1[23] = Symbol.DIAMOND;
+        reel1[24] = Symbol.ORANGE; reel1[25] = Symbol.BELL; reel1[26] = Symbol.CHERRIES; reel1[27] = Symbol.DOUBLEBAR;
+        reel1[28] = Symbol.STAR; reel1[29] = Symbol.DIAMOND; reel1[30] = Symbol.BAR; reel1[31] = Symbol.BELL;
+        reel1[32] = Symbol.CHERRIES; reel1[33] = Symbol.ORANGE; reel1[34] = Symbol.CHERRIES; reel1[35] = Symbol.ORANGE;
+        
+        // Initialize Reel 2: 8 cherries, 7 oranges, 6 stars, 5 bells, 4 diamonds, 3 bars, 2 doublebars, 1 seven
+        reel2[0] = Symbol.STAR; reel2[1] = Symbol.DOUBLEBAR; reel2[2] = Symbol.DIAMOND; reel2[3] = Symbol.ORANGE;
+        reel2[4] = Symbol.CHERRIES; reel2[5] = Symbol.BELL; reel2[6] = Symbol.ORANGE; reel2[7] = Symbol.STAR;
+        reel2[8] = Symbol.BAR; reel2[9] = Symbol.CHERRIES; reel2[10] = Symbol.ORANGE; reel2[11] = Symbol.BELL;
+        reel2[12] = Symbol.STAR; reel2[13] = Symbol.DIAMOND; reel2[14] = Symbol.CHERRIES; reel2[15] = Symbol.ORANGE;
+        reel2[16] = Symbol.BELL; reel2[17] = Symbol.STAR; reel2[18] = Symbol.SEVEN; reel2[19] = Symbol.BAR;
+        reel2[20] = Symbol.DIAMOND; reel2[21] = Symbol.ORANGE; reel2[22] = Symbol.CHERRIES; reel2[23] = Symbol.STAR;
+        reel2[24] = Symbol.BELL; reel2[25] = Symbol.DOUBLEBAR; reel2[26] = Symbol.ORANGE; reel2[27] = Symbol.DIAMOND;
+        reel2[28] = Symbol.BAR; reel2[29] = Symbol.CHERRIES; reel2[30] = Symbol.STAR; reel2[31] = Symbol.BELL;
+        reel2[32] = Symbol.CHERRIES; reel2[33] = Symbol.ORANGE; reel2[34] = Symbol.CHERRIES; reel2[35] = Symbol.ORANGE;
+        
+        // Initialize Reel 3: 8 cherries, 7 oranges, 6 stars, 5 bells, 4 diamonds, 3 bars, 2 doublebars, 1 seven
+        reel3[0] = Symbol.BELL; reel3[1] = Symbol.BAR; reel3[2] = Symbol.STAR; reel3[3] = Symbol.CHERRIES;
+        reel3[4] = Symbol.ORANGE; reel3[5] = Symbol.DIAMOND; reel3[6] = Symbol.ORANGE; reel3[7] = Symbol.STAR;
+        reel3[8] = Symbol.ORANGE; reel3[9] = Symbol.BELL; reel3[10] = Symbol.CHERRIES; reel3[11] = Symbol.DOUBLEBAR;
+        reel3[12] = Symbol.STAR; reel3[13] = Symbol.DIAMOND; reel3[14] = Symbol.ORANGE; reel3[15] = Symbol.BELL;
+        reel3[16] = Symbol.CHERRIES; reel3[17] = Symbol.STAR; reel3[18] = Symbol.BAR; reel3[19] = Symbol.DIAMOND;
+        reel3[20] = Symbol.SEVEN; reel3[21] = Symbol.ORANGE; reel3[22] = Symbol.CHERRIES; reel3[23] = Symbol.BELL;
+        reel3[24] = Symbol.STAR; reel3[25] = Symbol.DOUBLEBAR; reel3[26] = Symbol.DIAMOND; reel3[27] = Symbol.ORANGE;
+        reel3[28] = Symbol.STAR; reel3[29] = Symbol.BAR; reel3[30] = Symbol.CHERRIES; reel3[31] = Symbol.BELL;
+        reel3[32] = Symbol.CHERRIES; reel3[33] = Symbol.ORANGE; reel3[34] = Symbol.CHERRIES; reel3[35] = Symbol.CHERRIES;
     }
     
     // ============ Commit-Reveal Gambling Functions ============
@@ -121,10 +175,15 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
      * @param _player The address of the player
      * @param _commitId The commit ID to check
      * @param _secret The secret number used in the original commit
-     * @return won True if this is a winning commit
-     * @return result The roll result (1-10)
+     * @return won True if this is a winning commit (all 3 reels match)
+     * @return reel1Pos Position on reel 1 (0-35)
+     * @return reel2Pos Position on reel 2 (0-35)
+     * @return reel3Pos Position on reel 3 (0-35)
+     * @return payout Amount won (10x bet if match, 0 otherwise)
      */
-    function isWinner(address _player, uint256 _commitId, uint256 _secret) external view returns (bool won, uint256 result) {
+    function isWinner(address _player, uint256 _commitId, uint256 _secret) 
+        external view returns (bool won, uint256 reel1Pos, uint256 reel2Pos, uint256 reel3Pos, uint256 payout) 
+    {
         Commit storage userCommit = commits[_player][_commitId];
         require(userCommit.commitBlock > 0, "Commit does not exist");
         require(blockhash(userCommit.commitBlock) != bytes32(0), "Blockhash not available");
@@ -133,11 +192,18 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
         bytes32 computedHash = keccak256(abi.encodePacked(_secret));
         require(computedHash == userCommit.commitHash, "Invalid secret");
         
-        // Calculate the result
-        result = _calculateResult(userCommit.commitBlock, _commitId, _secret);
-        won = (result >= 1 && result <= 4);
+        // Calculate the reel positions
+        (reel1Pos, reel2Pos, reel3Pos) = _calculateReelPositions(userCommit.commitBlock, _commitId, _secret);
         
-        return (won, result);
+        // Get symbols at those positions
+        Symbol symbol1 = reel1[reel1Pos];
+        Symbol symbol2 = reel2[reel2Pos];
+        Symbol symbol3 = reel3[reel3Pos];
+        
+        // Calculate win and payout using the new function
+        (won, payout) = calculatePayout(symbol1, symbol2, symbol3, BET_SIZE);
+        
+        return (won, reel1Pos, reel2Pos, reel3Pos, payout);
     }
     
     /**
@@ -170,17 +236,24 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
             
             userCommit.revealed = true;
             
-            // Calculate the result using blockhash, commitId, and secret
-            uint256 result = _calculateResult(userCommit.commitBlock, _commitId, _secret);
+            // Calculate the reel positions
+            (uint256 reel1Pos, uint256 reel2Pos, uint256 reel3Pos) = _calculateReelPositions(userCommit.commitBlock, _commitId, _secret);
             
-            // Determine payout
-            uint256 payout = 0;
-            if (result >= 1 && result <= 4) {
-                // Winner! Gets 2x their bet
-                payout = BET_SIZE * PAYOUT_MULTIPLIER;
+            // Get symbols at those positions
+            Symbol symbol1 = reel1[reel1Pos];
+            Symbol symbol2 = reel2[reel2Pos];
+            Symbol symbol3 = reel3[reel3Pos];
+            
+            // Calculate win and payout using the new function
+            (bool won, uint256 payout) = calculatePayout(symbol1, symbol2, symbol3, BET_SIZE);
+            
+            // Store winnings if any
+            if (won) {
                 userCommit.amountWon = payout;
             }
             
+            // Encode reel positions as a single result number for event (just for backwards compat)
+            uint256 result = reel1Pos * 10000 + reel2Pos * 100 + reel3Pos;
             emit GameRevealed(msg.sender, _commitId, result, payout);
             
             // If no winnings, return early
@@ -234,18 +307,140 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     // ============ Internal Game Logic ============
     
     /**
-     * @dev Calculate the game result using blockhash + commitId + secret
-     * @return result A number from 1-10
+     * @dev Calculate reel positions using blockhash + commitId + secret
+     * @return reel1Pos Position on reel 1 (0-35)
+     * @return reel2Pos Position on reel 2 (0-35)
+     * @return reel3Pos Position on reel 3 (0-35)
      */
-    function _calculateResult(
+    function _calculateReelPositions(
         uint256 _commitBlock,
         uint256 _commitId,
         uint256 _secret
-    ) internal view returns (uint256) {
+    ) internal view returns (uint256 reel1Pos, uint256 reel2Pos, uint256 reel3Pos) {
         bytes32 blockHash = blockhash(_commitBlock);
         bytes32 seed = keccak256(abi.encodePacked(blockHash, _commitId, _secret));
-        uint256 randomNumber = uint256(seed);
-        return (randomNumber % 10) + 1; // Returns 1-10
+        
+        // Split the 32-byte hash into three chunks
+        // Use bytes 0-10 for reel1, bytes 11-21 for reel2, bytes 22-31 for reel3
+        uint256 chunk1 = uint256(bytes32(seed) >> 176); // First 10 bytes (80 bits), shift right by 176 bits
+        uint256 chunk2 = uint256(bytes32(seed << 80) >> 176); // Middle 10 bytes
+        uint256 chunk3 = uint256(bytes32(seed << 160) >> 192); // Last 9 bytes (72 bits), shift right by 192 bits
+        
+        // Mod by 36 to get positions
+        reel1Pos = chunk1 % 36;
+        reel2Pos = chunk2 % 36;
+        reel3Pos = chunk3 % 36;
+        
+        return (reel1Pos, reel2Pos, reel3Pos);
+    }
+    
+    /**
+     * @notice Get all payout multipliers for frontend display
+     * @return symbolPayouts Array of multipliers in symbol order [CHERRIES, ORANGE, STAR, BELL, DIAMOND, BAR, DOUBLEBAR, SEVEN]
+     * @return anybarPayout The ANYBAR special case multiplier
+     */
+    function getPayouts() external pure returns (uint256[8] memory symbolPayouts, uint256 anybarPayout) {
+        symbolPayouts[0] = PAYOUT_CHERRIES;
+        symbolPayouts[1] = PAYOUT_ORANGE;
+        symbolPayouts[2] = PAYOUT_STAR;
+        symbolPayouts[3] = PAYOUT_BELL;
+        symbolPayouts[4] = PAYOUT_DIAMOND;
+        symbolPayouts[5] = PAYOUT_BAR;
+        symbolPayouts[6] = PAYOUT_DOUBLEBAR;
+        symbolPayouts[7] = PAYOUT_SEVEN;
+        anybarPayout = PAYOUT_ANYBAR;
+        return (symbolPayouts, anybarPayout);
+    }
+    
+    /**
+     * @notice Calculate if symbols represent a win and the payout amount
+     * @param symbol1 First reel symbol
+     * @param symbol2 Second reel symbol
+     * @param symbol3 Third reel symbol
+     * @param betSize The bet amount
+     * @return hasWon True if this is a winning combination
+     * @return payout The payout amount (betSize * multiplier)
+     */
+    function calculatePayout(Symbol symbol1, Symbol symbol2, Symbol symbol3, uint256 betSize) 
+        public pure returns (bool hasWon, uint256 payout) 
+    {
+        // Check for exact three-of-a-kind matches first
+        if (symbol1 == symbol2 && symbol2 == symbol3) {
+            hasWon = true;
+            if (symbol1 == Symbol.CHERRIES) {
+                payout = betSize * PAYOUT_CHERRIES;
+            } else if (symbol1 == Symbol.ORANGE) {
+                payout = betSize * PAYOUT_ORANGE;
+            } else if (symbol1 == Symbol.STAR) {
+                payout = betSize * PAYOUT_STAR;
+            } else if (symbol1 == Symbol.BELL) {
+                payout = betSize * PAYOUT_BELL;
+            } else if (symbol1 == Symbol.DIAMOND) {
+                payout = betSize * PAYOUT_DIAMOND;
+            } else if (symbol1 == Symbol.BAR) {
+                payout = betSize * PAYOUT_BAR;
+            } else if (symbol1 == Symbol.DOUBLEBAR) {
+                payout = betSize * PAYOUT_DOUBLEBAR;
+            } else if (symbol1 == Symbol.SEVEN) {
+                payout = betSize * PAYOUT_SEVEN;
+            }
+            return (hasWon, payout);
+        }
+        
+        // Check for ANYBAR: any combination of BAR and DOUBLEBAR
+        bool isSymbol1Bar = (symbol1 == Symbol.BAR || symbol1 == Symbol.DOUBLEBAR);
+        bool isSymbol2Bar = (symbol2 == Symbol.BAR || symbol2 == Symbol.DOUBLEBAR);
+        bool isSymbol3Bar = (symbol3 == Symbol.BAR || symbol3 == Symbol.DOUBLEBAR);
+        
+        if (isSymbol1Bar && isSymbol2Bar && isSymbol3Bar) {
+            hasWon = true;
+            payout = betSize * PAYOUT_ANYBAR;
+            return (hasWon, payout);
+        }
+        
+        // No win
+        return (false, 0);
+    }
+    
+    // ============ View Functions for Reels ============
+    
+    /**
+     * @notice Get all symbols on reel 1
+     * @return Array of 36 symbols
+     */
+    function getReel1() external view returns (Symbol[36] memory) {
+        return reel1;
+    }
+    
+    /**
+     * @notice Get all symbols on reel 2
+     * @return Array of 36 symbols
+     */
+    function getReel2() external view returns (Symbol[36] memory) {
+        return reel2;
+    }
+    
+    /**
+     * @notice Get all symbols on reel 3
+     * @return Array of 36 symbols
+     */
+    function getReel3() external view returns (Symbol[36] memory) {
+        return reel3;
+    }
+    
+    /**
+     * @notice Get symbol at a specific position on a reel
+     * @param _reelNum Reel number (1, 2, or 3)
+     * @param _position Position on the reel (0-35)
+     * @return The symbol at that position
+     */
+    function getSymbolAtPosition(uint8 _reelNum, uint256 _position) external view returns (Symbol) {
+        require(_position < 36, "Invalid position");
+        require(_reelNum >= 1 && _reelNum <= 3, "Invalid reel number");
+        
+        if (_reelNum == 1) return reel1[_position];
+        if (_reelNum == 2) return reel2[_position];
+        return reel3[_position];
     }
     
     // ============ Liquidity Management Override ============
