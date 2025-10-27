@@ -6,6 +6,31 @@ import "./SimpleTokenSale.sol";
 import "./ManagedTreasury.sol";
 
 /**
+
+                                                  ,--,                         ,----, 
+                                               ,---.'|       ,----..         ,/   .`| 
+,-.----.                  ,----..    .--.--.   |   | :      /   /   \      ,`   .'  : 
+\    /  \           ,--, /   /   \  /  /    '. :   : |     /   .     :   ;    ;     / 
+;   :    \        ,'_ /||   :     :|  :  /`. / |   ' :    .   /   ;.  \.'___,/    ,'  
+|   | .\ :   .--. |  | :.   |  ;. /;  |  |--`  ;   ; '   .   ;   /  ` ;|    :     |   
+.   : |: | ,'_ /| :  . |.   ; /--` |  :  ;_    '   | |__ ;   |  ; \ ; |;    |.';  ;   
+|   |  \ : |  ' | |  . .;   | ;  __ \  \    `. |   | :.'||   :  | ; | '`----'  |  |   
+|   : .  / |  | ' |  | ||   : |.' .' `----.   \'   :    ;.   |  ' ' ' :    '   :  ;   
+;   | |  \ :  | | :  ' ;.   | '_.' : __ \  \  ||   |  ./ '   ;  \; /  |    |   |  '   
+|   | ;\  \|  ; ' |  | ''   ; : \  |/  /`--'  /;   : ;    \   \  ',  /     '   :  |   
+:   ' | \.':  | : ;  ; |'   | '/  .'--'.     / |   ,/      ;   :    /      ;   |.'    
+:   : :-'  '  :  `--'   \   :    /   `--'---'  '---'        \   \ .'       '---'      
+|   |.'    :  ,      .-./\   \ .'                            `---`                    
+`---'       `--`----'     `---`                                                       
+
+                           
+                                                                                      
+
+DO NOT USE THIS -- IT IS A PROTOTYPE AND FULLY RUGGABLE ON PURPOSE -- DO NOT USE THIS
+
+
+
+
  * @title RugSlot
  * @notice Commit-reveal slot machine with automated treasury management via Uniswap
  * @dev Manages RugSlotToken and implements slot machine mechanics, buyback/burn, and emergency minting
