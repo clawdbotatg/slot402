@@ -11,10 +11,10 @@ import "./RugSlotToken.sol";
 abstract contract ManagedTreasury {
     // ============ Constants ============
     
-    // TESTING: All values are 1/100 of normal for live network testing with reduced capital
-    uint256 public constant TREASURY_THRESHOLD = 0.00135 ether; // Reserve to ensure contract can cover payouts (was 0.135)
-    uint256 public constant LIQUIDITY_ETH_AMOUNT = 0.00015 ether; // 10% of 0.0015 ETH token sale (was 0.015)
-    uint256 public constant LIQUIDITY_TOKEN_AMOUNT = 15 * 10**17; // 1.5 tokens: 10% of 15 total (was 150)
+    // TESTING: All values are 1/10 of normal for live network testing with reduced capital
+    uint256 public constant TREASURY_THRESHOLD = 0.0135 ether; // Reserve to ensure contract can cover payouts (was 0.135)
+    uint256 public constant LIQUIDITY_ETH_AMOUNT = 0.0015 ether; // 10% of 0.015 ETH token sale (was 0.015)
+    uint256 public constant LIQUIDITY_TOKEN_AMOUNT = 15 * 10**18; // 15 tokens: 10% of 150 total (was 150)
     
     address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
     
@@ -74,8 +74,8 @@ abstract contract ManagedTreasury {
         if (balance > TREASURY_THRESHOLD) {
             uint256 excess = balance - TREASURY_THRESHOLD;
             
-            // Only buyback if excess is meaningful (> 0.00001 ETH to avoid dust)
-            if (excess > 0.00001 ether) {
+            // Only buyback if excess is meaningful (> 0.00005 ETH to avoid dust)
+            if (excess > 0.00005 ether) {
                 uint256 tokensBought = _swapETHForTokens(excess);
                 if (tokensBought > 0) {
                     // Burn the tokens
@@ -224,11 +224,40 @@ abstract contract ManagedTreasury {
     }
     
     /**
+     * @notice Admin function to test swapping ETH for tokens
+     * @dev Only owner can call. Useful for testing swaps after adding liquidity
+     * @return amountOut Amount of tokens received
+     */
+    function adminSwapETHForTokens() external payable onlyOwner returns (uint256 amountOut) {
+        require(msg.value > 0, "Must send ETH");
+        require(uniswapPair != address(0), "No liquidity pool");
+        
+        return _swapETHForTokens(msg.value);
+    }
+    
+    /**
+     * @notice Admin function to test swapping tokens for ETH
+     * @dev Only owner can call. Mints tokens first, then swaps them for ETH
+     * @param _tokenAmount Amount of tokens to mint and swap
+     * @return amountOut Amount of ETH received
+     */
+    function adminSwapTokensForETH(uint256 _tokenAmount) external onlyOwner returns (uint256 amountOut) {
+        require(_tokenAmount > 0, "Must specify token amount");
+        require(uniswapPair != address(0), "No liquidity pool");
+        
+        // Mint tokens to this contract first
+        token.mint(address(this), _tokenAmount);
+        
+        // Now swap them for ETH
+        return _swapTokensForETH(_tokenAmount);
+    }
+    
+    /**
      * @dev Swap ETH for tokens (for buyback and burn)
      * @return amountOut Amount of tokens received
      */
     function _swapETHForTokens(uint256 _ethAmount) internal returns (uint256 amountOut) {
-        if (_ethAmount == 0) return 0;
+        require(_ethAmount > 0, "Amount must be > 0");
         
         // Wrap ETH to WETH
         IWETH(WETH).deposit{value: _ethAmount}();
@@ -238,19 +267,16 @@ abstract contract ManagedTreasury {
         path[0] = WETH;
         path[1] = address(token);
         
-        // No slippage protection - accept any amount
-        try IUniswapV2Router(UNISWAP_V2_ROUTER).swapExactTokensForTokens(
+        // Perform swap - will revert if it fails
+        uint256[] memory amounts = IUniswapV2Router(UNISWAP_V2_ROUTER).swapExactTokensForTokens(
             _ethAmount,
-            1,
+            1, // Accept any amount (no slippage protection)
             path,
             address(this),
             block.timestamp + 300
-        ) returns (uint256[] memory amounts) {
-            return amounts[1];
-        } catch {
-            // Swap failed completely
-            return 0;
-        }
+        );
+        
+        return amounts[1];
     }
     
     /**
@@ -258,7 +284,7 @@ abstract contract ManagedTreasury {
      * @return amountOut Amount of ETH received
      */
     function _swapTokensForETH(uint256 _tokenAmount) internal returns (uint256 amountOut) {
-        if (_tokenAmount == 0) return 0;
+        require(_tokenAmount > 0, "Amount must be > 0");
         
         // Approve router to spend tokens
         require(token.approve(UNISWAP_V2_ROUTER, _tokenAmount), "Token approval failed");
@@ -267,22 +293,19 @@ abstract contract ManagedTreasury {
         path[0] = address(token);
         path[1] = WETH;
         
-        // No slippage protection - accept any amount
-        try IUniswapV2Router(UNISWAP_V2_ROUTER).swapExactTokensForTokens(
+        // Perform swap - will revert if it fails
+        uint256[] memory amounts = IUniswapV2Router(UNISWAP_V2_ROUTER).swapExactTokensForTokens(
             _tokenAmount,
-            1,
+            1, // Accept any amount (no slippage protection)
             path,
             address(this),
             block.timestamp + 300
-        ) returns (uint256[] memory amounts) {
-            // Unwrap WETH to ETH
-            uint256 wethReceived = amounts[1];
-            IWETH(WETH).withdraw(wethReceived);
-            return wethReceived;
-        } catch {
-            // Swap failed completely
-            return 0;
-        }
+        );
+        
+        // Unwrap WETH to ETH
+        uint256 wethReceived = amounts[1];
+        IWETH(WETH).withdraw(wethReceived);
+        return wethReceived;
     }
 }
 

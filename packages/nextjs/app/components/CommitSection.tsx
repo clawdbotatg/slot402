@@ -25,7 +25,7 @@ export function CommitSection({
     <div className="bg-base-200 rounded-lg p-6 mb-6">
       <h2 className="text-2xl font-semibold mb-4">1. Commit</h2>
       <p className="mb-4 text-sm opacity-70">
-        Click to generate a random secret and commit your bet on-chain. Bet: 0.00001 ETH
+        Click to generate a random secret and commit your bet on-chain. Bet: 0.00005 ETH
       </p>
 
       {/* Error Display */}
@@ -54,7 +54,7 @@ export function CommitSection({
           onClick={onCommit}
           disabled={isCommitting || isPolling || !connectedAddress || commitCount === undefined}
         >
-          {isCommitting || isPolling ? "🎲 Rolling..." : "🎲 Roll & Commit (0.00001 ETH)"}
+          {isCommitting || isPolling ? "🎲 Rolling..." : "🎲 Roll & Commit (0.00005 ETH)"}
         </button>
       </div>
       {commitId !== null && (

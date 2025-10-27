@@ -48,6 +48,8 @@ const SlotReel = memo(function SlotReel({
   const lastProcessedStopTrigger = useRef(0);
   // Ref to immediately stop animation when target is reached
   const hasSnappedToTarget = useRef(false);
+  // Store the target symbol index for final position correction
+  const targetSymbolIndex = useRef<number | null>(null);
 
   // Start spinning when spinTrigger changes
   useEffect(() => {
@@ -87,10 +89,12 @@ const SlotReel = memo(function SlotReel({
             const absDistanceToTarget = Math.abs(distanceToTarget);
 
             // Snap directly to target when very close for perfect centering
-            // Check absolute distance to handle both approaching and overshooting
-            if (absDistanceToTarget <= 3) {
+            // Increased threshold to 10px to catch edge cases before they get misaligned
+            if (absDistanceToTarget <= 10) {
               let normalizedTarget = targetPosition % reelLength;
               if (normalizedTarget < 0) normalizedTarget += reelLength;
+              // Round to nearest integer to avoid floating point precision issues
+              normalizedTarget = Math.round(normalizedTarget);
 
               hasSnappedToTarget.current = true;
               setIsStopping(false);
@@ -98,12 +102,14 @@ const SlotReel = memo(function SlotReel({
               setDecelerationStartPosition(null);
               setIsBouncing(true);
               return normalizedTarget;
-            } else if (absDistanceToTarget <= 6) {
+            } else if (absDistanceToTarget <= 20) {
               // Slow down to crawl speed near target for precision (only last ~6px)
               // If we've overshot (negative distance), snap immediately
               if (distanceToTarget < 0) {
                 let normalizedTarget = targetPosition % reelLength;
                 if (normalizedTarget < 0) normalizedTarget += reelLength;
+                // Round to nearest integer to avoid floating point precision issues
+                normalizedTarget = Math.round(normalizedTarget);
 
                 hasSnappedToTarget.current = true;
                 setIsStopping(false);
@@ -118,15 +124,31 @@ const SlotReel = memo(function SlotReel({
               setCurrentSpeed(minSpeed);
             } else {
               // Fast deceleration
-              const newSpeed = Math.max(2, currentSpeed - deceleration);
+              let newSpeed = Math.max(2, currentSpeed - deceleration);
+
+              // When very close (20-40px), limit speed to prevent overshoot
+              if (absDistanceToTarget <= 40) {
+                // Limit speed to half the distance to ensure we don't overshoot
+                newSpeed = Math.min(newSpeed, Math.max(1, Math.floor(absDistanceToTarget / 2)));
+              }
+
               setCurrentSpeed(newSpeed);
               newPosition = prevPosition + newSpeed;
 
-              // Safety check: if we would overshoot, slow down to crawling speed
+              // Safety check: if we would overshoot, snap immediately to target
               const nextDistanceToTarget = targetPosition - newPosition;
               if (nextDistanceToTarget < 0 && distanceToTarget > 0) {
-                newPosition = prevPosition + 1;
-                setCurrentSpeed(1);
+                // Don't overshoot - snap to target now
+                let normalizedTarget = targetPosition % reelLength;
+                if (normalizedTarget < 0) normalizedTarget += reelLength;
+                normalizedTarget = Math.round(normalizedTarget);
+
+                hasSnappedToTarget.current = true;
+                setIsStopping(false);
+                setCurrentSpeed(0);
+                setDecelerationStartPosition(null);
+                setIsBouncing(true);
+                return normalizedTarget;
               }
             }
           } else {
@@ -182,6 +204,19 @@ const SlotReel = memo(function SlotReel({
       if (frame >= bounceFrames) {
         setBounceOffset(0);
         setIsBouncing(false);
+
+        // FINAL SAFETY SNAP: Ensure we're at the exact correct position
+        if (targetSymbolIndex.current !== null) {
+          const correctPosition =
+            containerCenter + 2 * reelLength - targetSymbolIndex.current * symbolHeight - symbolHeight / 2;
+          let normalizedCorrectPosition = correctPosition % reelLength;
+          if (normalizedCorrectPosition < 0) normalizedCorrectPosition += reelLength;
+          normalizedCorrectPosition = Math.round(normalizedCorrectPosition);
+
+          // Force the position to be exactly correct
+          setPosition(normalizedCorrectPosition);
+        }
+
         if (onSpinComplete) onSpinComplete();
         return;
       }
@@ -197,7 +232,7 @@ const SlotReel = memo(function SlotReel({
     animationFrameId = requestAnimationFrame(animateBounce);
 
     return () => cancelAnimationFrame(animationFrameId);
-  }, [isBouncing, onSpinComplete, position]);
+  }, [isBouncing, onSpinComplete, containerCenter, reelLength, symbolHeight]);
 
   // Control spinning sound
   useEffect(() => {
@@ -261,7 +296,10 @@ const SlotReel = memo(function SlotReel({
     }
 
     // Pick a random symbol if not specified
-    const targetSymbolIndex = symbolIndex !== undefined ? symbolIndex : Math.floor(Math.random() * symbols.length);
+    const finalSymbolIndex = symbolIndex !== undefined ? symbolIndex : Math.floor(Math.random() * symbols.length);
+
+    // Store the target symbol index for final position correction
+    targetSymbolIndex.current = finalSymbolIndex;
 
     setIsStopping(true);
     setIsSpinning(false);
@@ -269,10 +307,9 @@ const SlotReel = memo(function SlotReel({
 
     // Calculate position needed to center the target symbol
     // With top: -2*reelLength, to center symbol i: -2*reelLength + i*symbolHeight + symbolHeight/2 + position = containerCenter
-    const desiredSymbolPosition =
-      containerCenter + 2 * reelLength - targetSymbolIndex * symbolHeight - symbolHeight / 2;
+    const desiredSymbolPosition = containerCenter + 2 * reelLength - finalSymbolIndex * symbolHeight - symbolHeight / 2;
 
-    let target = desiredSymbolPosition;
+    let target = Math.round(desiredSymbolPosition);
     const currentPos = positionRef.current;
 
     while (target < currentPos + stoppingDistance + 100) {

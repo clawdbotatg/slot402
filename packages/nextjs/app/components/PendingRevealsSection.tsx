@@ -5,17 +5,43 @@ interface PendingRevealsSectionProps {
   pendingReveals: PendingReveal[];
   currentBlockNumber: bigint | undefined;
   onCollect: (commitId: string, secret: string) => void;
+  onRemove: (commitId: string) => void;
 }
 
-export function PendingRevealsSection({ pendingReveals, currentBlockNumber, onCollect }: PendingRevealsSectionProps) {
+export function PendingRevealsSection({
+  pendingReveals,
+  currentBlockNumber,
+  onCollect,
+  onRemove,
+}: PendingRevealsSectionProps) {
   if (pendingReveals.length === 0) return null;
+
+  const expiredReveals = pendingReveals.filter(reveal => {
+    const blocksRemaining =
+      currentBlockNumber && reveal.commitBlock ? 256n - (currentBlockNumber - reveal.commitBlock) : 256n;
+    return blocksRemaining <= 0n;
+  });
+
+  const clearAllExpired = () => {
+    expiredReveals.forEach(reveal => onRemove(reveal.commitId));
+  };
 
   return (
     <div className="bg-warning text-warning-content rounded-lg p-6 mb-6">
-      <h2 className="text-2xl font-semibold mb-4">💰 Uncollected Winnings ({pendingReveals.length})</h2>
-      <p className="mb-4 text-sm opacity-90">
-        You have {pendingReveals.length} winning reveal{pendingReveals.length > 1 ? "s" : ""} waiting to be collected!
-      </p>
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <h2 className="text-2xl font-semibold">💰 Uncollected Winnings ({pendingReveals.length})</h2>
+          <p className="text-sm opacity-90">
+            You have {pendingReveals.length} winning reveal{pendingReveals.length > 1 ? "s" : ""} waiting to be
+            collected!
+          </p>
+        </div>
+        {expiredReveals.length > 0 && (
+          <button onClick={clearAllExpired} className="btn btn-sm btn-error">
+            Clear Expired ({expiredReveals.length})
+          </button>
+        )}
+      </div>
       <div className="space-y-3">
         {pendingReveals.map(reveal => {
           const blocksRemaining =

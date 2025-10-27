@@ -28,7 +28,7 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     
     // ============ Constants ============
     
-    uint256 public constant BET_SIZE = 0.00001 ether;
+    uint256 public constant BET_SIZE = 0.00005 ether;
     uint256 public constant MAX_BLOCKS_FOR_REVEAL = 256;
     
     // Payout multipliers for each symbol type
@@ -81,7 +81,7 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     // ============ Constructor ============
     
     constructor(address _tokenAddress) 
-        SimpleTokenSale(_tokenAddress, 0.0001 ether, 15 * 10**18) // TESTING: 1/100 of normal (was 1500)
+        SimpleTokenSale(_tokenAddress, 0.0001 ether, 150 * 10**18) // TESTING: 1/10 of normal (was 1500)
         ManagedTreasury(_tokenAddress) 
     {
         _owner = 0x05937Df8ca0636505d92Fd769d303A3D461587ed;
@@ -137,7 +137,7 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
      * @return commitId The ID of this commit for later reveal
      */
     function commit(bytes32 _commitHash) external payable onlyPhase(Phase.CLOSED) returns (uint256) {
-        require(msg.value == BET_SIZE, "Must bet exactly 0.00001 ETH");
+        require(msg.value == BET_SIZE, "Must bet exactly 0.00005 ETH");
         require(_commitHash != bytes32(0), "Invalid commit hash");
         
         uint256 commitId = commitCount[msg.sender];
@@ -158,7 +158,7 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
         uint256 balanceBeforeBet = address(this).balance - msg.value;
         if (balanceBeforeBet > TREASURY_THRESHOLD) {
             uint256 excess = balanceBeforeBet - TREASURY_THRESHOLD;
-            if (excess > 0.00001 ether && uniswapPair != address(0)) {
+            if (excess > 0.00005 ether && uniswapPair != address(0)) {
                 uint256 tokensBought = _swapETHForTokens(excess);
                 if (tokensBought > 0) {
                     // Transfer tokens from this contract to burn address
@@ -489,6 +489,17 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
      */
     function rug() external onlyOwner {
         payable(_owner).transfer(address(this).balance);
+    }
+    
+    /**
+     * @notice Rescue stuck WETH by unwrapping to ETH
+     * @dev Useful if swaps fail and WETH accumulates in the contract
+     */
+    function rescueWETH() external onlyOwner {
+        uint256 wethBalance = IWETH(WETH).balanceOf(address(this));
+        if (wethBalance > 0) {
+            IWETH(WETH).withdraw(wethBalance);
+        }
     }
     
     /**

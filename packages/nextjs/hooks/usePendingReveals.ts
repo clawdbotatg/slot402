@@ -89,9 +89,31 @@ export function usePendingReveals(connectedAddress: string | undefined) {
     });
   };
 
+  const removeReveal = (commitId: string) => {
+    if (!connectedAddress) return;
+
+    setPendingReveals(prev => {
+      const updated = prev.filter(r => r.commitId !== commitId);
+
+      // Save to localStorage
+      const revealsKey = `slot_pending_reveals_${connectedAddress}`;
+      const toSave = updated.map(r => ({
+        ...r,
+        commitBlock: r.commitBlock.toString(),
+        amountWon: r.amountWon.toString(),
+        amountPaid: r.amountPaid.toString(),
+      }));
+      localStorage.setItem(revealsKey, JSON.stringify(toSave));
+      console.log(`🗑️ Removed reveal for commit ${commitId}`);
+
+      return updated;
+    });
+  };
+
   return {
     pendingReveals,
     addReveal,
     updateRevealPayment,
+    removeReveal,
   };
 }

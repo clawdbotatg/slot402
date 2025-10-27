@@ -1,6 +1,7 @@
 "use client";
 
 // @refresh reset
+import { useEffect } from "react";
 import { Balance } from "../Balance";
 import { AddressInfoDropdown } from "./AddressInfoDropdown";
 import { AddressQRCodeModal } from "./AddressQRCodeModal";
@@ -8,6 +9,7 @@ import { RevealBurnerPKModal } from "./RevealBurnerPKModal";
 import { WrongNetworkDropdown } from "./WrongNetworkDropdown";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { Address } from "viem";
+import { useAccount } from "wagmi";
 import { useNetworkColor } from "~~/hooks/scaffold-eth";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
 import { getBlockExplorerAddressLink } from "~~/utils/scaffold-eth";
@@ -18,6 +20,17 @@ import { getBlockExplorerAddressLink } from "~~/utils/scaffold-eth";
 export const RainbowKitCustomConnectButton = () => {
   const networkColor = useNetworkColor();
   const { targetNetwork } = useTargetNetwork();
+  const { isConnected } = useAccount();
+
+  // Set flag when user explicitly connects a wallet
+  // Clear flag when disconnected
+  useEffect(() => {
+    if (isConnected) {
+      localStorage.setItem("scaffold-eth-2.wallet.explicit", "true");
+    } else {
+      localStorage.removeItem("scaffold-eth-2.wallet.explicit");
+    }
+  }, [isConnected]);
 
   return (
     <ConnectButton.Custom>

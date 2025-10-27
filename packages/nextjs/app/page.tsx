@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { OwnerControls } from "./components/OwnerControls";
+import { PayoutTable } from "./components/PayoutTable";
 import { PendingRevealsSection } from "./components/PendingRevealsSection";
 import { RecoverySection } from "./components/RecoverySection";
 import { SlotMachine } from "./components/SlotMachine";
 import { TokenSalePhase } from "./components/TokenSalePhase";
+import { TokenSection } from "./components/TokenSection";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { parseEther } from "viem";
 import { useAccount, useBlockNumber } from "wagmi";
@@ -62,7 +65,7 @@ export default function Home() {
     clearCommit,
   } = useCommitStorage(connectedAddress);
 
-  const { pendingReveals, addReveal, updateRevealPayment } = usePendingReveals(connectedAddress);
+  const { pendingReveals, addReveal, updateRevealPayment, removeReveal } = usePendingReveals(connectedAddress);
 
   // Watch for new blocks
   const { data: currentBlockNumber } = useBlockNumber({ watch: true });
@@ -201,16 +204,20 @@ export default function Home() {
 
       console.log("Commit hash (from contract):", commitHash);
 
-      // Wait for user to sign transaction
-      await writeCommit({
+      console.log("⏳ Waiting for user to sign transaction...");
+
+      // Wait for user to sign transaction - this will throw if rejected or fails
+      const txHash = await writeCommit({
         functionName: "commit",
         args: [commitHash as `0x${string}`],
-        value: parseEther("0.00001"),
+        value: parseEther("0.00005"),
       });
 
-      console.log("✅ Transaction sent! User signed and transaction is broadcasting...");
+      // Only reach here if transaction was successfully signed
+      console.log("✅ Transaction signed! Hash:", txHash);
+      console.log("📡 Transaction is broadcasting...");
 
-      // NOW play the lever pull sound and animation (after user signed)
+      // NOW play the lever pull sound and animation (after user signed successfully)
       const leverAudio = new Audio(
         "/sounds/316931__timbre__lever-pull-one-armed-bandit-from-freesound-316887-by-ylearkisto.flac",
       );
@@ -232,10 +239,26 @@ export default function Home() {
 
       console.log("🔄 Starting polling...");
     } catch (e: any) {
-      console.error("❌ Transaction failed:", e);
+      console.error("❌ Transaction signing failed or was rejected:", e);
+
+      // Stop all animations and reset state
       setIsPolling(false);
       setIsCommitting(false);
-      const errorMsg = e?.message?.split("\n")[0] || "Transaction failed";
+      setReelsAnimating(false);
+
+      // Parse error message
+      let errorMsg = "Transaction failed";
+      if (e?.message) {
+        // Handle common error messages
+        if (e.message.includes("User rejected") || e.message.includes("User denied")) {
+          errorMsg = "Transaction rejected by user";
+        } else if (e.message.includes("account")) {
+          errorMsg = e.message.split("\n")[0];
+        } else {
+          errorMsg = e.message.split("\n")[0];
+        }
+      }
+
       setRollError(`Roll failed: ${errorMsg}`);
       clearCommit();
     }
@@ -367,7 +390,9 @@ export default function Home() {
                     />
                   </>
                 )}
-                <div style={{ position: "absolute", top: "300px", left: "50%", transform: "translateX(-50%)" }}>
+                <div
+                  style={{ position: "absolute", top: "300px", left: "50%", transform: "translateX(-50%)", zIndex: 2 }}
+                >
                   <SlotMachine
                     onSpinStart={() => {}}
                     onAllReelsComplete={() => {
@@ -427,15 +452,22 @@ export default function Home() {
                       justifyContent: "center",
                       padding: "1rem",
                       borderRadius: "0",
-                      backgroundColor: "red",
+                      backgroundColor:
+                        !!connectedAddress && (isCommitting || isPolling || reelsAnimating || commitCount === undefined)
+                          ? "#666666"
+                          : "red",
                       fontSize: "14px",
-                      boxShadow: "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black",
+                      boxShadow:
+                        !!connectedAddress && isCommitting ? "none" : "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black",
                       position: "relative",
                       zIndex: 10,
                       border: "4px solid black",
-                      transform: "perspective(400px) rotateX(8deg)",
+                      transform:
+                        !!connectedAddress && isCommitting
+                          ? "perspective(400px) rotateX(8deg) translateY(8px)"
+                          : "perspective(400px) rotateX(8deg)",
                       transformStyle: "preserve-3d",
-                      transition: "transform 0.1s ease, box-shadow 0.1s ease",
+                      transition: "transform 0.1s ease, box-shadow 0.1s ease, background-color 0.1s ease",
                     }}
                     onClick={handleRollButtonClick}
                     disabled={
@@ -448,19 +480,23 @@ export default function Home() {
                       }
                     }}
                     onMouseUp={e => {
-                      e.currentTarget.style.transform = "perspective(400px) rotateX(8deg)";
-                      e.currentTarget.style.boxShadow = "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black";
+                      if (!e.currentTarget.disabled) {
+                        e.currentTarget.style.transform = "perspective(400px) rotateX(8deg)";
+                        e.currentTarget.style.boxShadow = "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black";
+                      }
                     }}
                     onMouseLeave={e => {
-                      e.currentTarget.style.transform = "perspective(400px) rotateX(8deg)";
-                      e.currentTarget.style.boxShadow = "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black";
+                      if (!e.currentTarget.disabled) {
+                        e.currentTarget.style.transform = "perspective(400px) rotateX(8deg)";
+                        e.currentTarget.style.boxShadow = "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black";
+                      }
                     }}
                   >
                     {!connectedAddress
                       ? "Connect Wallet"
                       : isCommitting || isPolling || reelsAnimating
                         ? "Rolling..."
-                        : "Roll (0.00001 ETH)"}
+                        : "Roll (0.00005 ETH)"}
                   </button>
                 </div>
 
@@ -482,6 +518,7 @@ export default function Home() {
                       pendingReveals={pendingReveals}
                       currentBlockNumber={currentBlockNumber}
                       onCollect={handleCollectFromReveal}
+                      onRemove={removeReveal}
                     />
                   </div>
                 )}
@@ -506,6 +543,27 @@ export default function Home() {
             pendingRevealsCount={pendingReveals.length}
             onUnjam={handleUnjam}
           />
+
+          {/* Payout Table */}
+          {currentPhase === 1 && (
+            <div className="mt-12">
+              <PayoutTable />
+            </div>
+          )}
+
+          {/* Token Section */}
+          {currentPhase === 1 && (
+            <div className="mt-8">
+              <TokenSection />
+            </div>
+          )}
+
+          {/* View Smart Contracts Button */}
+          <div className="mt-12 mb-8 flex justify-center">
+            <Link href="/debug">
+              <button className="btn btn-primary btn-lg">🔧 View Smart Contracts</button>
+            </Link>
+          </div>
         </div>
       </div>
     </div>

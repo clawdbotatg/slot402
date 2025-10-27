@@ -13,18 +13,6 @@ import scaffoldConfig from "~~/scaffold.config";
 
 const { onlyLocalBurnerWallet, targetNetworks } = scaffoldConfig;
 
-const wallets = [
-  metaMaskWallet,
-  walletConnectWallet,
-  ledgerWallet,
-  coinbaseWallet,
-  rainbowWallet,
-  safeWallet,
-  ...(!targetNetworks.some(network => network.id !== (chains.hardhat as chains.Chain).id) || !onlyLocalBurnerWallet
-    ? [rainbowkitBurnerWallet]
-    : []),
-];
-
 /**
  * wagmi connectors for the wagmi context
  */
@@ -34,6 +22,18 @@ export const wagmiConnectors = () => {
   if (typeof window === "undefined") {
     return [];
   }
+
+  const wallets = [
+    metaMaskWallet,
+    walletConnectWallet,
+    ledgerWallet,
+    coinbaseWallet,
+    rainbowWallet,
+    safeWallet,
+    ...(!targetNetworks.some(network => network.id !== (chains.hardhat as chains.Chain).id) || !onlyLocalBurnerWallet
+      ? [rainbowkitBurnerWallet]
+      : []),
+  ];
 
   return connectorsForWallets(
     [

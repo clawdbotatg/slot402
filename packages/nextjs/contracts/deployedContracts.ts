@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   8453: {
     RugSlotToken: {
-      address: "0x73220ee29fe5bb90a42fedeceaf02cc1fd4e4116",
+      address: "0xf84e2a0fd93489c3abcbfb1ab5802d7603353c7e",
       abi: [
         {
           type: "constructor",
@@ -387,10 +387,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 37309521,
+      deployedOnBlock: 37396992,
     },
     RugSlot: {
-      address: "0x65970d5c42f6b367547fc21368c6028ec938736c",
+      address: "0xf71a73d7fb5fd6568c5f45bfa9a7cb8a9b8f77c5",
       abi: [
         {
           type: "constructor",
@@ -659,6 +659,38 @@ const deployedContracts = {
           name: "addLiquidity",
           inputs: [],
           outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "adminSwapETHForTokens",
+          inputs: [],
+          outputs: [
+            {
+              name: "amountOut",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "payable",
+        },
+        {
+          type: "function",
+          name: "adminSwapTokensForETH",
+          inputs: [
+            {
+              name: "_tokenAmount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "amountOut",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
           stateMutability: "nonpayable",
         },
         {
@@ -1063,6 +1095,13 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "rescueWETH",
+          inputs: [],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "revealAndCollect",
           inputs: [
             {
@@ -1355,12 +1394,12 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 37309521,
+      deployedOnBlock: 37396992,
     },
   },
   31337: {
     RugSlotToken: {
-      address: "0xa3f13114029db8dd9cfcbd1bd9d373a855f86cb0",
+      address: "0x75f2bbef013b76d2fdacc88a6c3a8591682b9111",
       abi: [
         {
           type: "constructor",
@@ -1740,10 +1779,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 37360285,
+      deployedOnBlock: 37398551,
     },
     RugSlot: {
-      address: "0x3314c81c9d995b028777570a7d02786bc43e74fa",
+      address: "0x9ee9c2ab25be4d991759f6d2fa23c2b7871ee708",
       abi: [
         {
           type: "constructor",
@@ -2012,6 +2051,38 @@ const deployedContracts = {
           name: "addLiquidity",
           inputs: [],
           outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "adminSwapETHForTokens",
+          inputs: [],
+          outputs: [
+            {
+              name: "amountOut",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "payable",
+        },
+        {
+          type: "function",
+          name: "adminSwapTokensForETH",
+          inputs: [
+            {
+              name: "_tokenAmount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "amountOut",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
           stateMutability: "nonpayable",
         },
         {
@@ -2416,6 +2487,13 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "rescueWETH",
+          inputs: [],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "revealAndCollect",
           inputs: [
             {
@@ -2708,7 +2786,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 37360286,
+      deployedOnBlock: 37398552,
     },
   },
   42161: {
@@ -2986,6 +3064,38 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "adminSwapETHForTokens",
+          inputs: [],
+          outputs: [
+            {
+              name: "amountOut",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "payable",
+        },
+        {
+          type: "function",
+          name: "adminSwapTokensForETH",
+          inputs: [
+            {
+              name: "_tokenAmount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "amountOut",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "buyTokens",
           inputs: [],
           outputs: [],
@@ -3380,6 +3490,13 @@ const deployedContracts = {
         {
           type: "function",
           name: "renounceOwnership",
+          inputs: [],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "rescueWETH",
           inputs: [],
           outputs: [],
           stateMutability: "nonpayable",

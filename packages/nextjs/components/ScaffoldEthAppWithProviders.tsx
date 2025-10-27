@@ -45,8 +45,13 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
     setMounted(true);
   }, []);
 
+  // Check if user has explicitly connected before - if not, prevent reconnection
+  // We check this synchronously to avoid state changes after mount
+  const shouldReconnect =
+    typeof window !== "undefined" ? !!localStorage.getItem("scaffold-eth-2.wallet.explicit") : false;
+
   return (
-    <WagmiProvider config={wagmiConfig}>
+    <WagmiProvider config={wagmiConfig} reconnectOnMount={shouldReconnect}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider
           avatar={BlockieAvatar}

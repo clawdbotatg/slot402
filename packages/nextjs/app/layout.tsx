@@ -9,6 +9,14 @@ export const metadata = getMetadata({
   description: "Built with 🏗 Scaffold-ETH 2",
 });
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 0.4,
+  minimumScale: 0.3,
+  maximumScale: 5,
+  userScalable: true,
+};
+
 const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
   return (
     <html suppressHydrationWarning className={``} data-theme="dark">

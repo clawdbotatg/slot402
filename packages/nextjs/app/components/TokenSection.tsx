@@ -1,0 +1,399 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { formatEther } from "viem";
+import { usePublicClient } from "wagmi";
+import { Address } from "~~/components/scaffold-eth";
+import { useDeployedContractInfo, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { useGlobalState } from "~~/services/store/store";
+
+// Uniswap V2 Pair ABI (just the functions we need)
+const PAIR_ABI = [
+  {
+    constant: true,
+    inputs: [],
+    name: "getReserves",
+    outputs: [
+      { name: "reserve0", type: "uint112" },
+      { name: "reserve1", type: "uint112" },
+      { name: "blockTimestampLast", type: "uint32" },
+    ],
+    type: "function",
+  },
+  {
+    constant: true,
+    inputs: [],
+    name: "token0",
+    outputs: [{ name: "", type: "address" }],
+    type: "function",
+  },
+  {
+    constant: true,
+    inputs: [],
+    name: "token1",
+    outputs: [{ name: "", type: "address" }],
+    type: "function",
+  },
+] as const;
+
+// Uniswap V2 Router ABI (just getAmountsOut)
+const ROUTER_ABI = [
+  {
+    constant: true,
+    inputs: [
+      { name: "amountIn", type: "uint256" },
+      { name: "path", type: "address[]" },
+    ],
+    name: "getAmountsOut",
+    outputs: [{ name: "amounts", type: "uint256[]" }],
+    type: "function",
+  },
+] as const;
+
+// Uniswap V2 Router address on Base
+const UNISWAP_V2_ROUTER = "0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24";
+
+export const TokenSection = () => {
+  const publicClient = usePublicClient();
+  const [tokenPriceInEth, setTokenPriceInEth] = useState<string | null>(null);
+  const [tokenPriceInUsd, setTokenPriceInUsd] = useState<string | null>(null);
+  const [wethReserve, setWethReserve] = useState<string | null>(null);
+  const [tokenReserve, setTokenReserve] = useState<string | null>(null);
+  const nativeCurrencyPrice = useGlobalState(state => state.nativeCurrency.price);
+
+  // Get deployed contract info
+  const { data: contractInfo } = useDeployedContractInfo("RugSlot");
+
+  // Read token address from contract
+  const { data: tokenAddress } = useScaffoldReadContract({
+    contractName: "RugSlot",
+    functionName: "token",
+  });
+
+  // Read uniswap pair address from contract
+  const { data: uniswapPairAddress } = useScaffoldReadContract({
+    contractName: "RugSlot",
+    functionName: "uniswapPair",
+  });
+
+  // Read treasury threshold
+  const { data: treasuryThreshold } = useScaffoldReadContract({
+    contractName: "RugSlot",
+    functionName: "TREASURY_THRESHOLD",
+  });
+
+  // Read contract balance
+  const [treasuryBalance, setTreasuryBalance] = useState<bigint | null>(null);
+
+  // Fetch treasury balance
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (!publicClient || !contractInfo?.address) return;
+
+      try {
+        const balance = await publicClient.getBalance({ address: contractInfo.address });
+        setTreasuryBalance(balance);
+      } catch (error) {
+        console.error("Error fetching treasury balance:", error);
+      }
+    };
+
+    fetchBalance();
+    // Refresh balance every 10 seconds
+    const interval = setInterval(fetchBalance, 10000);
+    return () => clearInterval(interval);
+  }, [publicClient, contractInfo?.address]);
+
+  // Fetch token price from Uniswap pair
+  useEffect(() => {
+    const fetchTokenPrice = async () => {
+      if (!publicClient || !uniswapPairAddress || !tokenAddress) return;
+
+      try {
+        // Get reserves from the pair
+        const reserves = (await publicClient.readContract({
+          address: uniswapPairAddress as `0x${string}`,
+          abi: PAIR_ABI,
+          functionName: "getReserves",
+        })) as [bigint, bigint, number];
+
+        // Get token0 address to determine which reserve is which
+        const token0 = (await publicClient.readContract({
+          address: uniswapPairAddress as `0x${string}`,
+          abi: PAIR_ABI,
+          functionName: "token0",
+        })) as string;
+
+        const reserve0 = reserves[0];
+        const reserve1 = reserves[1];
+
+        // Determine which reserve is WETH and which is the token
+        // WETH address on Base: 0x4200000000000000000000000000000000000006
+        const WETH = "0x4200000000000000000000000000000000000006";
+        const isToken0WETH = token0.toLowerCase() === WETH.toLowerCase();
+
+        const wethReserveBigInt = isToken0WETH ? reserve0 : reserve1;
+        const tokenReserveBigInt = isToken0WETH ? reserve1 : reserve0;
+
+        // Store reserves for display
+        setWethReserve(formatEther(wethReserveBigInt));
+        setTokenReserve(formatEther(tokenReserveBigInt));
+
+        // Get EXACT price by querying Uniswap Router directly
+        // "If I SELL 0.1 tokens, how much WETH do I GET back?"
+        const pointOneToken = BigInt(1e17); // 0.1 token with 18 decimals
+        const WETH_ADDRESS = "0x4200000000000000000000000000000000000006";
+
+        try {
+          // Query Uniswap Router for the exact swap amount
+          const amounts = (await publicClient.readContract({
+            address: UNISWAP_V2_ROUTER as `0x${string}`,
+            abi: ROUTER_ABI,
+            functionName: "getAmountsOut",
+            args: [pointOneToken, [tokenAddress as `0x${string}`, WETH_ADDRESS as `0x${string}`]],
+          })) as bigint[];
+
+          // amounts[0] is the input (0.1 tokens), amounts[1] is the output (WETH)
+          const wethReceived = amounts[1];
+
+          const priceInEth = formatEther(wethReceived);
+          setTokenPriceInEth(priceInEth);
+
+          // Calculate USD price using dynamic ETH price
+          if (nativeCurrencyPrice > 0) {
+            const priceInUsdValue = parseFloat(priceInEth) * nativeCurrencyPrice;
+            setTokenPriceInUsd(priceInUsdValue.toFixed(6));
+          }
+        } catch (error) {
+          console.error("Error fetching price from router:", error);
+        }
+      } catch (error) {
+        console.error("Error fetching token price:", error);
+      }
+    };
+
+    fetchTokenPrice();
+    // Refresh price every 30 seconds
+    const interval = setInterval(fetchTokenPrice, 30000);
+    return () => clearInterval(interval);
+  }, [publicClient, uniswapPairAddress, tokenAddress, nativeCurrencyPrice]);
+
+  if (!tokenAddress) return null;
+
+  const blockExplorerUrl = `https://basescan.org/token/${tokenAddress}`;
+  const uniswapUrl = `https://app.uniswap.org/explore/tokens/base/${tokenAddress}`;
+
+  return (
+    <div className="w-full max-w-4xl mx-auto p-6 rounded-lg" style={{ backgroundColor: "#2d5a66" }}>
+      <div className="space-y-6">
+        {/* Token Address */}
+        <div className="p-4 rounded-lg border-2 border-black" style={{ backgroundColor: "#1c3d45" }}>
+          <div className="font-semibold text-white mb-2">Token Address:</div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Address address={tokenAddress} />
+            <a
+              href={blockExplorerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-sm"
+              style={{ backgroundColor: "#3a6b78", color: "white", border: "2px solid black" }}
+            >
+              📊 View on BaseScan
+            </a>
+            <a
+              href={uniswapUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-sm"
+              style={{ backgroundColor: "#FF007A", color: "white", border: "2px solid black" }}
+            >
+              🦄 Trade on Uniswap
+            </a>
+          </div>
+        </div>
+
+        {/* Token Price */}
+        {tokenPriceInEth && (
+          <div className="p-4 rounded-lg border-2 border-black" style={{ backgroundColor: "#3a6b78" }}>
+            <div className="font-semibold text-white mb-3">Current Price (Sell):</div>
+            <div className="text-lg text-gray-300 mb-2">
+              0.1 tokens ={" "}
+              <span className="text-2xl text-green-300 font-bold">{parseFloat(tokenPriceInEth).toFixed(8)} ETH</span>
+              {tokenPriceInUsd && <span className="text-lg text-gray-300 ml-2">(${tokenPriceInUsd} USD)</span>}
+            </div>
+            <div className="text-sm text-gray-400 mb-4">
+              1 token ≈{" "}
+              <span className="text-green-300 font-semibold">{(parseFloat(tokenPriceInEth) * 10).toFixed(8)} ETH</span>
+              {tokenPriceInUsd && (
+                <span className="text-gray-400"> (${(parseFloat(tokenPriceInUsd) * 10).toFixed(6)} USD)</span>
+              )}
+            </div>
+
+            {/* Liquidity Pool Info */}
+            {uniswapPairAddress && (
+              <div className="mt-4 pt-4 border-t border-gray-600">
+                <div className="text-sm font-semibold text-white mb-2">Uniswap V2 Pool:</div>
+                <div className="mb-3">
+                  <Address address={uniswapPairAddress} />
+                </div>
+
+                {/* Reserves */}
+                {wethReserve && tokenReserve && (
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="p-2 rounded" style={{ backgroundColor: "#2d5a66" }}>
+                      <div className="text-gray-300 mb-1">WETH Reserve:</div>
+                      <div className="text-white font-bold">{parseFloat(wethReserve).toFixed(4)} WETH</div>
+                    </div>
+                    <div className="p-2 rounded" style={{ backgroundColor: "#2d5a66" }}>
+                      <div className="text-gray-300 mb-1">RUGSLOT Reserve:</div>
+                      <div className="text-white font-bold">{parseFloat(tokenReserve).toFixed(2)} RUGSLOT</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Treasury Progress Bar */}
+        {treasuryBalance !== null && treasuryThreshold && (
+          <div className="p-4 rounded-lg border-2 border-black" style={{ backgroundColor: "#1c3d45" }}>
+            <div className="font-semibold text-white mb-3">Treasury Status:</div>
+
+            <div className="space-y-2">
+              {/* Current Balance Display */}
+              <div className="flex justify-between text-sm text-gray-300">
+                <span>Current Balance:</span>
+                <span className="font-bold text-white">{parseFloat(formatEther(treasuryBalance)).toFixed(6)} ETH</span>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="relative h-8 bg-gray-700 rounded-lg border-2 border-black overflow-hidden">
+                {/* Calculate percentage - threshold appears at 90% of the bar */}
+                {(() => {
+                  const thresholdValue = Number(formatEther(treasuryThreshold));
+                  const balanceValue = Number(formatEther(treasuryBalance));
+                  // Show range from 0 to ~1.11x threshold (so threshold is at 90%)
+                  const maxDisplay = thresholdValue / 0.9;
+                  const percentage = Math.min((balanceValue / maxDisplay) * 100, 100);
+                  const thresholdPosition = 90; // Threshold is at 90% of the display
+
+                  const isAboveThreshold = balanceValue >= thresholdValue;
+                  const barColor = isAboveThreshold ? "#10b981" : "#ef4444"; // green if above, red if below
+
+                  return (
+                    <>
+                      {/* Fill bar */}
+                      <div
+                        className="absolute top-0 left-0 h-full transition-all duration-300"
+                        style={{
+                          width: `${percentage}%`,
+                          backgroundColor: barColor,
+                        }}
+                      />
+
+                      {/* Threshold marker line */}
+                      <div
+                        className="absolute top-0 h-full w-1 bg-yellow-400 z-10"
+                        style={{
+                          left: `${thresholdPosition}%`,
+                          boxShadow: "0 0 10px rgba(250, 204, 21, 0.8)",
+                        }}
+                      />
+
+                      {/* Labels */}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-xs font-bold text-white drop-shadow-lg z-20">
+                          {isAboveThreshold ? "🔥 BUYBACK MODE" : "⚠️ DEFICIT"}
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+
+              {/* Legend */}
+              <div className="flex justify-between text-xs text-gray-400 mt-1">
+                <span>0 ETH</span>
+                <span className="text-yellow-300 font-bold" style={{ marginLeft: "auto", marginRight: "10%" }}>
+                  ⭐ {parseFloat(formatEther(treasuryThreshold)).toFixed(6)} ETH
+                </span>
+                <span>{(parseFloat(formatEther(treasuryThreshold)) / 0.9).toFixed(6)} ETH</span>
+              </div>
+
+              {/* Status description */}
+              <div className="text-xs text-gray-300 mt-2 p-2 rounded" style={{ backgroundColor: "#2d5a66" }}>
+                {(() => {
+                  const thresholdValue = Number(formatEther(treasuryThreshold));
+                  const balanceValue = Number(formatEther(treasuryBalance));
+
+                  if (balanceValue >= thresholdValue) {
+                    const excess = balanceValue - thresholdValue;
+                    return (
+                      <>
+                        💰 <span className="text-green-300 font-bold">Surplus:</span> Treasury has{" "}
+                        <span className="text-green-300 font-bold">{excess.toFixed(6)} ETH</span> above threshold.
+                        Contract will buyback & burn tokens! 🔥
+                      </>
+                    );
+                  } else {
+                    const deficit = thresholdValue - balanceValue;
+                    return (
+                      <>
+                        ⚠️ <span className="text-red-300 font-bold">Deficit:</span> Treasury needs{" "}
+                        <span className="text-red-300 font-bold">{deficit.toFixed(6)} ETH</span> to reach threshold.
+                        Contract will mint & sell tokens if needed for payouts.
+                      </>
+                    );
+                  }
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tokenomics Explanation */}
+        <div className="p-4 rounded-lg border-2 border-black" style={{ backgroundColor: "#1c3d45" }}>
+          <div className="space-y-4">
+            <div className="p-4 rounded-lg border-2 border-black" style={{ backgroundColor: "#2d5a66" }}>
+              <div className="flex items-start gap-3">
+                <div className="text-3xl">✅</div>
+                <div>
+                  <div className="font-bold text-green-300 mb-1">
+                    Treasury Surplus ({">"} {treasuryThreshold ? formatEther(treasuryThreshold) : "0.0135"} ETH)
+                  </div>
+                  <div className="text-sm text-gray-300">
+                    The contract automatically buys $RUGSLOT tokens from Uniswap and burns them, reducing supply and
+                    increasing scarcity.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-lg border-2 border-black" style={{ backgroundColor: "#2d5a66" }}>
+              <div className="flex items-start gap-3">
+                <div className="text-3xl">⚠️</div>
+                <div>
+                  <div className="font-bold text-yellow-300 mb-1">Treasury Deficit ({"<"} 0 ETH available)</div>
+                  <div className="text-sm text-gray-300">
+                    The contract mints new $RUGSLOT tokens and sells them on Uniswap to raise ETH for covering player
+                    payouts.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-sm text-gray-300 mt-4 p-3 rounded" style={{ backgroundColor: "#3a6b78" }}>
+              💡 This mechanism ensures the slot machine always has enough funds to pay winners while creating buying
+              pressure during profitable periods. The treasury threshold of{" "}
+              <span className="text-yellow-300 font-bold">
+                {treasuryThreshold ? formatEther(treasuryThreshold) : "0.0135"} ETH
+              </span>{" "}
+              acts as a reserve buffer.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
