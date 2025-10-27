@@ -8,14 +8,15 @@ export interface PendingReveal {
   amountPaid: bigint;
 }
 
-export function usePendingReveals(connectedAddress: string | undefined) {
+export function usePendingReveals(connectedAddress: string | undefined, contractAddress: string | undefined) {
   const [pendingReveals, setPendingReveals] = useState<PendingReveal[]>([]);
 
   // Load pending reveals from localStorage on mount
   useEffect(() => {
-    if (!connectedAddress) return;
+    if (!connectedAddress || !contractAddress) return;
 
-    const revealsKey = `slot_pending_reveals_${connectedAddress}`;
+    const contractSuffix = contractAddress.slice(0, 10); // 0x + 8 chars
+    const revealsKey = `slot_pending_reveals_${connectedAddress}_${contractSuffix}`;
     const savedReveals = localStorage.getItem(revealsKey);
 
     if (savedReveals) {
@@ -35,10 +36,10 @@ export function usePendingReveals(connectedAddress: string | undefined) {
         console.error("Error parsing pending reveals:", e);
       }
     }
-  }, [connectedAddress]);
+  }, [connectedAddress, contractAddress]);
 
   const addReveal = (reveal: PendingReveal) => {
-    if (!connectedAddress) return;
+    if (!connectedAddress || !contractAddress) return;
 
     setPendingReveals(prev => {
       // Check if this commitId already exists
@@ -50,7 +51,8 @@ export function usePendingReveals(connectedAddress: string | undefined) {
 
       const updated = [...prev, reveal];
       // Save to localStorage
-      const revealsKey = `slot_pending_reveals_${connectedAddress}`;
+      const contractSuffix = contractAddress.slice(0, 10); // 0x + 8 chars
+      const revealsKey = `slot_pending_reveals_${connectedAddress}_${contractSuffix}`;
       const toSave = updated.map(r => ({
         ...r,
         commitBlock: r.commitBlock.toString(),
@@ -58,13 +60,13 @@ export function usePendingReveals(connectedAddress: string | undefined) {
         amountPaid: r.amountPaid.toString(),
       }));
       localStorage.setItem(revealsKey, JSON.stringify(toSave));
-      console.log("💾 Saved winning reveal to pending reveals:", reveal);
+      console.log(`💾 Saved winning reveal to pending reveals with contract ${contractSuffix}:`, reveal);
       return updated;
     });
   };
 
   const updateRevealPayment = (commitId: string, amountPaid: bigint, amountWon: bigint) => {
-    if (!connectedAddress) return;
+    if (!connectedAddress || !contractAddress) return;
 
     setPendingReveals(prev => {
       let updated = prev.map(r => (r.commitId === commitId ? { ...r, amountPaid: amountPaid } : r));
@@ -76,7 +78,8 @@ export function usePendingReveals(connectedAddress: string | undefined) {
       }
 
       // Save to localStorage
-      const revealsKey = `slot_pending_reveals_${connectedAddress}`;
+      const contractSuffix = contractAddress.slice(0, 10); // 0x + 8 chars
+      const revealsKey = `slot_pending_reveals_${connectedAddress}_${contractSuffix}`;
       const toSave = updated.map(r => ({
         ...r,
         commitBlock: r.commitBlock.toString(),
@@ -90,13 +93,14 @@ export function usePendingReveals(connectedAddress: string | undefined) {
   };
 
   const removeReveal = (commitId: string) => {
-    if (!connectedAddress) return;
+    if (!connectedAddress || !contractAddress) return;
 
     setPendingReveals(prev => {
       const updated = prev.filter(r => r.commitId !== commitId);
 
       // Save to localStorage
-      const revealsKey = `slot_pending_reveals_${connectedAddress}`;
+      const contractSuffix = contractAddress.slice(0, 10); // 0x + 8 chars
+      const revealsKey = `slot_pending_reveals_${connectedAddress}_${contractSuffix}`;
       const toSave = updated.map(r => ({
         ...r,
         commitBlock: r.commitBlock.toString(),

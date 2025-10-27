@@ -43,7 +43,7 @@ export const Header = () => {
           <div className="text-3xl">{phaseEmoji}</div>
           <div className="flex flex-col">
             <span className="font-bold leading-tight">Based Slot</span>
-            <span className="text-xs">Provably fair, co-op-as-house, slot machine.</span>
+            <span className="text-xs">Provably fair, co-op-as-the-house, slot machine.</span>
           </div>
         </Link>
         <div className="text-lg font-semibold">

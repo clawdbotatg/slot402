@@ -14,7 +14,7 @@ import { parseEther } from "viem";
 import { useAccount, useBlockNumber } from "wagmi";
 import { usePublicClient } from "wagmi";
 import deployedContracts from "~~/contracts/deployedContracts";
-import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { useDeployedContractInfo, useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth";
 import { useCommitPolling } from "~~/hooks/useCommitPolling";
 import { useCommitStorage } from "~~/hooks/useCommitStorage";
@@ -35,6 +35,12 @@ export default function Home() {
   const [spinCounter, setSpinCounter] = useState(0);
   const [reelsAnimating, setReelsAnimating] = useState(false);
   const [showPulledLever, setShowPulledLever] = useState(false);
+  const [restorationAttempted, setRestorationAttempted] = useState(false);
+  const [initialReelPositions, setInitialReelPositions] = useState<{
+    reel1: number;
+    reel2: number;
+    reel3: number;
+  } | null>(null);
 
   // Map Symbol enum to image paths
   const symbolToImage = (symbolIndex: number): string => {
@@ -52,20 +58,50 @@ export default function Home() {
     return symbols[symbolIndex] || "/slot/cherries.png";
   };
 
+  // Get deployed contract info for contract address
+  const { data: rugSlotContractInfo } = useDeployedContractInfo("RugSlot");
+  const rugSlotAddress = rugSlotContractInfo?.address;
+
+  // Load saved reel positions from localStorage on mount (universal across all users)
+  useEffect(() => {
+    if (!rugSlotAddress) return;
+
+    const contractSuffix = rugSlotAddress.slice(0, 10); // 0x + 8 chars
+    const savedPositionsKey = `slot_last_reel_positions_${contractSuffix}`;
+    const savedPositions = localStorage.getItem(savedPositionsKey);
+
+    if (savedPositions) {
+      try {
+        const positions = JSON.parse(savedPositions);
+        console.log("📍 Loaded last reel positions from localStorage:", positions);
+        setInitialReelPositions(positions);
+        setReelPositions(positions);
+      } catch (e) {
+        console.error("Failed to parse saved reel positions:", e);
+      }
+    }
+  }, [rugSlotAddress]);
+
   // Custom hooks for state management
   const {
     commitId,
     secret,
+    isRolling: hasActiveRoll,
     setCommitId,
     setSecret,
     setIsWinner,
     setRollResult,
     saveCommit,
+    markRollActive,
     updateResult,
+    clearRollingState,
     clearCommit,
-  } = useCommitStorage(connectedAddress);
+  } = useCommitStorage(connectedAddress, rugSlotAddress);
 
-  const { pendingReveals, addReveal, updateRevealPayment, removeReveal } = usePendingReveals(connectedAddress);
+  const { pendingReveals, addReveal, updateRevealPayment, removeReveal } = usePendingReveals(
+    connectedAddress,
+    rugSlotAddress,
+  );
 
   // Watch for new blocks
   const { data: currentBlockNumber } = useBlockNumber({ watch: true });
@@ -121,12 +157,47 @@ export default function Home() {
     }
   }, [contractReel3]);
 
+  // Detect active roll on page load and resume it (only attempt once)
+  useEffect(() => {
+    console.log("🔍 Roll restoration check:", {
+      hasActiveRoll,
+      hasCommitId: commitId !== null,
+      hasSecret: !!secret,
+      hasAddress: !!connectedAddress,
+      isPolling,
+      reelsAnimating,
+      restorationAttempted,
+    });
+
+    if (
+      hasActiveRoll &&
+      commitId !== null &&
+      secret &&
+      connectedAddress &&
+      !isPolling &&
+      !reelsAnimating &&
+      !restorationAttempted
+    ) {
+      console.log("🔄 Detected active roll on page load, resuming...");
+      console.log(`Commit ID: ${commitId}, Secret: ${secret.substring(0, 10)}...`);
+
+      setRestorationAttempted(true);
+
+      // Start animations and polling
+      setReelsAnimating(true);
+      setSpinCounter(prev => prev + 1);
+      setIsPolling(true);
+      setIsCommitting(true);
+    }
+  }, [hasActiveRoll, commitId, secret, connectedAddress, isPolling, reelsAnimating, restorationAttempted]);
+
   // Polling hook
   useCommitPolling({
     isPolling,
     commitId,
     secret,
     connectedAddress,
+    contractAddress: rugSlotAddress,
     publicClient,
     targetNetworkId: targetNetwork.id,
     onResult: (won, rollNum) => {
@@ -135,9 +206,18 @@ export default function Home() {
       const reel2 = Math.floor((rollNum % 10000) / 100);
       const reel3 = rollNum % 100;
 
-      setReelPositions({ reel1, reel2, reel3 });
+      const positions = { reel1, reel2, reel3 };
+      setReelPositions(positions);
       updateResult(won, rollNum);
       setIsCommitting(false);
+
+      // Save positions to localStorage so they persist across page reloads (universal, not user-specific)
+      if (rugSlotAddress) {
+        const contractSuffix = rugSlotAddress.slice(0, 10); // 0x + 8 chars
+        const savedPositionsKey = `slot_last_reel_positions_${contractSuffix}`;
+        localStorage.setItem(savedPositionsKey, JSON.stringify(positions));
+        console.log("💾 Saved reel positions to localStorage:", positions);
+      }
     },
     onError: error => {
       setRollError(`Roll failed: ${error}`);
@@ -178,7 +258,7 @@ export default function Home() {
     setCommitId(currentCommitId);
     setIsWinner(null);
     setRollResult(null);
-    setReelPositions(null); // Clear previous reel positions
+    setReelPositions(null); // Clear previous reel positions for this new spin
 
     saveCommit(currentCommitId, randomSecret);
 
@@ -216,6 +296,10 @@ export default function Home() {
       // Only reach here if transaction was successfully signed
       console.log("✅ Transaction signed! Hash:", txHash);
       console.log("📡 Transaction is broadcasting...");
+
+      // Mark roll as active in localStorage BEFORE starting animations
+      // Pass currentCommitId directly since state might not be updated yet
+      markRollActive(currentCommitId);
 
       // NOW play the lever pull sound and animation (after user signed successfully)
       const leverAudio = new Audio(
@@ -333,6 +417,7 @@ export default function Home() {
     setIsCommitting(false);
     setRollError(null);
     setReelPositions(null);
+    setInitialReelPositions(null);
     setReelsAnimating(false);
 
     console.log("✅ Machine unjammed! UI state cleared.");
@@ -399,6 +484,9 @@ export default function Home() {
                       console.log("🎉 All reels animation complete! Button enabled.");
                       setReelsAnimating(false);
 
+                      // Clear the rolling state now that animations are done
+                      clearRollingState();
+
                       // If there are pending reveals, play jackpot alarm
                       if (pendingReveals.length > 0) {
                         const jackpotAlarm = new Audio("/sounds/541655__timbre__jackpot-alarm.wav");
@@ -414,6 +502,9 @@ export default function Home() {
                     stopPosition1={reelPositions?.reel1 ?? null}
                     stopPosition2={reelPositions?.reel2 ?? null}
                     stopPosition3={reelPositions?.reel3 ?? null}
+                    initialPosition1={initialReelPositions?.reel1 ?? null}
+                    initialPosition2={initialReelPositions?.reel2 ?? null}
+                    initialPosition3={initialReelPositions?.reel3 ?? null}
                     spinCounter={spinCounter}
                   />
                 </div>

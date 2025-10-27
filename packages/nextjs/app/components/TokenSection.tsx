@@ -140,8 +140,8 @@ export const TokenSection = () => {
         setTokenReserve(formatEther(tokenReserveBigInt));
 
         // Get EXACT price by querying Uniswap Router directly
-        // "If I SELL 0.1 tokens, how much WETH do I GET back?"
-        const pointOneToken = BigInt(1e17); // 0.1 token with 18 decimals
+        // "If I SELL 1 token, how much WETH do I GET back?"
+        const oneToken = BigInt(1e18); // 1 token with 18 decimals
         const WETH_ADDRESS = "0x4200000000000000000000000000000000000006";
 
         try {
@@ -150,10 +150,10 @@ export const TokenSection = () => {
             address: UNISWAP_V2_ROUTER as `0x${string}`,
             abi: ROUTER_ABI,
             functionName: "getAmountsOut",
-            args: [pointOneToken, [tokenAddress as `0x${string}`, WETH_ADDRESS as `0x${string}`]],
+            args: [oneToken, [tokenAddress as `0x${string}`, WETH_ADDRESS as `0x${string}`]],
           })) as bigint[];
 
-          // amounts[0] is the input (0.1 tokens), amounts[1] is the output (WETH)
+          // amounts[0] is the input (1 token), amounts[1] is the output (WETH)
           const wethReceived = amounts[1];
 
           const priceInEth = formatEther(wethReceived);
@@ -216,17 +216,10 @@ export const TokenSection = () => {
         {tokenPriceInEth && (
           <div className="p-4 rounded-lg border-2 border-black" style={{ backgroundColor: "#3a6b78" }}>
             <div className="font-semibold text-white mb-3">Current Price (Sell):</div>
-            <div className="text-lg text-gray-300 mb-2">
-              0.1 tokens ={" "}
+            <div className="text-lg text-gray-300 mb-4">
+              1 token ={" "}
               <span className="text-2xl text-green-300 font-bold">{parseFloat(tokenPriceInEth).toFixed(8)} ETH</span>
               {tokenPriceInUsd && <span className="text-lg text-gray-300 ml-2">(${tokenPriceInUsd} USD)</span>}
-            </div>
-            <div className="text-sm text-gray-400 mb-4">
-              1 token ≈{" "}
-              <span className="text-green-300 font-semibold">{(parseFloat(tokenPriceInEth) * 10).toFixed(8)} ETH</span>
-              {tokenPriceInUsd && (
-                <span className="text-gray-400"> (${(parseFloat(tokenPriceInUsd) * 10).toFixed(6)} USD)</span>
-              )}
             </div>
 
             {/* Liquidity Pool Info */}
@@ -390,6 +383,12 @@ export const TokenSection = () => {
                 {treasuryThreshold ? formatEther(treasuryThreshold) : "0.0135"} ETH
               </span>{" "}
               acts as a reserve buffer.
+            </div>
+
+            <div className="text-sm text-gray-300 mt-3 p-3 rounded" style={{ backgroundColor: "#3a6b78" }}>
+              🎰 <span className="font-bold text-blue-300">Become the House:</span> By buying $RUGSLOT tokens, you
+              become part owner of the house. The slot machine has a slight house edge, and profits from this edge flow
+              back to token holders through the buyback and burn mechanism when the treasury is in surplus.
             </div>
           </div>
         </div>

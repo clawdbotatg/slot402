@@ -8,6 +8,7 @@ interface SlotReelProps {
   reelNumber: number;
   spinTrigger: number; // Changes to this value trigger a spin
   stopCommand?: { trigger: number; symbolIndex: number } | null; // When set, stops on the specified symbol index
+  initialSymbolIndex?: number | null; // Initial symbol to display (overrides default)
   onSpinStart?: () => void;
   onSpinComplete?: () => void;
 }
@@ -16,6 +17,7 @@ const SlotReel = memo(function SlotReel({
   symbols,
   spinTrigger,
   stopCommand,
+  initialSymbolIndex,
   onSpinStart,
   onSpinComplete,
 }: SlotReelProps) {
@@ -26,12 +28,21 @@ const SlotReel = memo(function SlotReel({
   const stoppingDistance = 100;
   const containerCenter = 150;
 
-  // Calculate initial position to center symbol from the SECOND copy
-  // This way the first copy is above, ready to scroll into view
-  // To center symbol at array index 29 (symbols.length): -2*reelLength + 29*100 + 50 + position = 150
-  const initialPosition = containerCenter + 2 * reelLength - reelLength - symbolHeight / 2;
+  // Calculate initial position to center the desired symbol
+  // If initialSymbolIndex is provided, use it; otherwise default to centering symbol at index = symbols.length
+  const getInitialPosition = () => {
+    if (initialSymbolIndex !== null && initialSymbolIndex !== undefined) {
+      // Center the specified symbol
+      const pos = containerCenter + 2 * reelLength - initialSymbolIndex * symbolHeight - symbolHeight / 2;
+      let normalizedPos = pos % reelLength;
+      if (normalizedPos < 0) normalizedPos += reelLength;
+      return Math.round(normalizedPos);
+    }
+    // Default: center symbol from the SECOND copy (index = symbols.length)
+    return containerCenter + 2 * reelLength - reelLength - symbolHeight / 2;
+  };
 
-  const [position, setPosition] = useState(initialPosition);
+  const [position, setPosition] = useState(getInitialPosition());
   const [isSpinning, setIsSpinning] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   const [currentSpeed, setCurrentSpeed] = useState(0);

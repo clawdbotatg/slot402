@@ -7,6 +7,7 @@ interface UseCommitPollingParams {
   commitId: bigint | null;
   secret: string;
   connectedAddress: string | undefined;
+  contractAddress: string | undefined;
   publicClient: PublicClient | undefined;
   targetNetworkId: number;
   onResult: (won: boolean, rollNum: number) => void;
@@ -26,6 +27,7 @@ export function useCommitPolling({
   commitId,
   secret,
   connectedAddress,
+  contractAddress,
   publicClient,
   targetNetworkId,
   onResult,
@@ -34,7 +36,7 @@ export function useCommitPolling({
   onAddReveal,
 }: UseCommitPollingParams) {
   useEffect(() => {
-    if (!isPolling || commitId === null || !secret || !connectedAddress || !publicClient) return;
+    if (!isPolling || commitId === null || !secret || !connectedAddress || !contractAddress || !publicClient) return;
 
     console.log("🔄 Waiting 1 second before polling for commit ID:", commitId.toString());
 
@@ -73,8 +75,9 @@ export function useCommitPolling({
             onError("Commit not found on-chain - transaction may have failed");
 
             // Clear localStorage
-            if (connectedAddress) {
-              const storageKey = `slot_latest_commit_${connectedAddress}`;
+            if (connectedAddress && contractAddress) {
+              const contractSuffix = contractAddress.slice(0, 10); // 0x + 8 chars
+              const storageKey = `slot_latest_commit_${connectedAddress}_${contractSuffix}`;
               localStorage.removeItem(storageKey);
             }
 
@@ -177,6 +180,7 @@ export function useCommitPolling({
     commitId,
     secret,
     connectedAddress,
+    contractAddress,
     publicClient,
     targetNetworkId,
     onResult,

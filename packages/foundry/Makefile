@@ -37,7 +37,7 @@ get-address:
 
 # Compile contracts
 compile:
-	forge compile
+	@forge compile 2>&1 | awk '/^note\[/,/^$$/ {next} {print}' || true
 
 # Flatten contracts
 flatten:

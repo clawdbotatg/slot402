@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   8453: {
     RugSlotToken: {
-      address: "0xf84e2a0fd93489c3abcbfb1ab5802d7603353c7e",
+      address: "0xc7af97fe7f9ec214ee4fb676ad85ed6cd11fbfc5",
       abi: [
         {
           type: "constructor",
@@ -387,10 +387,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 37396992,
+      deployedOnBlock: 37401600,
     },
     RugSlot: {
-      address: "0xf71a73d7fb5fd6568c5f45bfa9a7cb8a9b8f77c5",
+      address: "0xd5582f8917460a2808816c46c44d55c7ea39e113",
       abi: [
         {
           type: "constructor",
@@ -1394,7 +1394,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 37396992,
+      deployedOnBlock: 37401600,
     },
   },
   31337: {
@@ -1779,7 +1779,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 37398551,
+      deployedOnBlock: 37400719,
     },
     RugSlot: {
       address: "0x9ee9c2ab25be4d991759f6d2fa23c2b7871ee708",
@@ -2786,7 +2786,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 37398552,
+      deployedOnBlock: 37400720,
     },
   },
   42161: {

@@ -10,6 +10,9 @@ interface SlotMachineProps {
   stopPosition1?: number | null;
   stopPosition2?: number | null;
   stopPosition3?: number | null;
+  initialPosition1?: number | null; // Initial display position for reel 1
+  initialPosition2?: number | null; // Initial display position for reel 2
+  initialPosition3?: number | null; // Initial display position for reel 3
   spinCounter: number; // Increment this to trigger a spin
 }
 
@@ -22,6 +25,9 @@ export function SlotMachine({
   stopPosition1,
   stopPosition2,
   stopPosition3,
+  initialPosition1,
+  initialPosition2,
+  initialPosition3,
   spinCounter,
 }: SlotMachineProps) {
   const [spinTrigger, setSpinTrigger] = useState(0);
@@ -111,6 +117,7 @@ export function SlotMachine({
           reelNumber={1}
           spinTrigger={spinTrigger}
           stopCommand={stopCommand1}
+          initialSymbolIndex={initialPosition1}
           onSpinStart={handleReelStart}
           onSpinComplete={handleReelComplete}
         />
@@ -119,6 +126,7 @@ export function SlotMachine({
           reelNumber={2}
           spinTrigger={spinTrigger}
           stopCommand={stopCommand2}
+          initialSymbolIndex={initialPosition2}
           onSpinStart={handleReelStart}
           onSpinComplete={handleReelComplete}
         />
@@ -127,6 +135,7 @@ export function SlotMachine({
           reelNumber={3}
           spinTrigger={spinTrigger}
           stopCommand={stopCommand3}
+          initialSymbolIndex={initialPosition3}
           onSpinStart={handleReelStart}
           onSpinComplete={handleReelComplete}
         />
