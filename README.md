@@ -1,8 +1,13 @@
-# slots 
+# 🎰based slot
 
-Using commit-reveal for provably fair randomness-driven slots.
+[ https://slot.atg.eth.link/ ](https://slot.atg.eth.link/)
 
-The goal of this project is to learn how token-based treasury management can work using Uniswap for LP (liquidity provision) and automated buy/sell operations.
+it's really hard to do commit-reveal randomness and have good UX (this is my attempt at that) 
+
+The goal of this project was also to learn how token-based treasury management can work using Uniswap for LP (liquidity provision) and automated buy/sell operations.
+
+<img width="1335" height="1188" alt="image" src="https://github.com/user-attachments/assets/a1c641ae-91bb-4c15-a051-311df503dd32" />
+
 
 
 ## Build with 🏗 Scaffold-ETH 2
