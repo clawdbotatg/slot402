@@ -20,6 +20,8 @@ type GlobalState = {
   setIsNativeCurrencyFetching: (newIsNativeCurrencyFetching: boolean) => void;
   targetNetwork: ChainWithAttributes;
   setTargetNetwork: (newTargetNetwork: ChainWithAttributes) => void;
+  openWelcomeModal: boolean;
+  setOpenWelcomeModal: (open: boolean) => void;
 };
 
 export const useGlobalState = create<GlobalState>(set => ({
@@ -36,4 +38,6 @@ export const useGlobalState = create<GlobalState>(set => ({
     ...NETWORKS_EXTRA_DATA[scaffoldConfig.targetNetworks[0].id],
   },
   setTargetNetwork: (newTargetNetwork: ChainWithAttributes) => set(() => ({ targetNetwork: newTargetNetwork })),
+  openWelcomeModal: false,
+  setOpenWelcomeModal: (open: boolean) => set(() => ({ openWelcomeModal: open })),
 }));
