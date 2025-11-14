@@ -1,0 +1,23 @@
+{
+  "name": "x402-facilitator",
+  "version": "1.0.0",
+  "description": "x402 Payment Facilitator for RugSlot",
+  "main": "facilitator.js",
+  "scripts": {
+    "start": "node facilitator.js"
+  },
+  "keywords": [
+    "x402",
+    "facilitator",
+    "ethereum",
+    "payments"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "ethers": "^6.9.0",
+    "express": "^4.18.2"
+  }
+}

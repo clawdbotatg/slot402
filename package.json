@@ -47,7 +47,10 @@
     "vercel": "yarn workspace @se-2/nextjs vercel",
     "vercel:login": "yarn workspace @se-2/nextjs vercel:login",
     "vercel:yolo": "yarn workspace @se-2/nextjs vercel:yolo",
-    "verify": "yarn foundry:verify"
+    "verify": "yarn foundry:verify",
+    "facilitator": "yarn workspace x402-facilitator start",
+    "server": "yarn workspace x402-server start",
+    "client": "yarn workspace x402-client start"
   },
   "devDependencies": {
     "husky": "~9.1.6",

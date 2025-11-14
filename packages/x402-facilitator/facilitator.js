@@ -1,0 +1,599 @@
+/**
+ * x402 Payment Facilitator for RugSlot
+ *
+ * This facilitator verifies EIP-712 signatures and settles payments on-chain
+ * using EIP-3009 transferWithAuthorization for USDC transfers
+ */
+
+const express = require("express");
+const cors = require("cors");
+const { ethers } = require("ethers");
+const dotenv = require("dotenv");
+
+dotenv.config();
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const PORT = process.env.PORT || 8001;
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
+const BASE_RPC_URL = process.env.BASE_RPC_URL;
+const CHAIN_ID = process.env.CHAIN_ID || "31337";
+
+// Validate configuration
+if (!PRIVATE_KEY || !BASE_RPC_URL) {
+  console.error("❌ Missing required environment variables!");
+  console.error("   Required: PRIVATE_KEY, BASE_RPC_URL");
+  console.error("   Optional: CHAIN_ID (defaults to 31337 for fork)");
+  process.exit(1);
+}
+
+// Initialize provider and wallet
+const provider = new ethers.JsonRpcProvider(BASE_RPC_URL);
+const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
+
+// Load deployed contracts from Foundry broadcast
+console.log(`🔍 Loading deployment for chain ID: ${CHAIN_ID}`);
+
+const path = require("path");
+const broadcastPath = path.join(
+  __dirname,
+  "../foundry/broadcast/Deploy.s.sol",
+  CHAIN_ID,
+  "run-latest.json"
+);
+console.log(`📂 Loading from: ${broadcastPath}`);
+
+let broadcast;
+try {
+  broadcast = require(broadcastPath);
+  console.log(`✅ Successfully loaded broadcast file for chain ${CHAIN_ID}`);
+} catch (error) {
+  console.error(`❌ Could not load deployment for chain ${CHAIN_ID}`);
+  console.error("   Error:", error.message);
+  console.error(`   Absolute path tried: ${broadcastPath}`);
+  console.error(`   Deploy to chain ${CHAIN_ID} first: yarn deploy`);
+  process.exit(1);
+}
+
+// Parse deployed contracts from broadcast transactions
+console.log(`🔎 Parsing deployed contracts from transactions...`);
+const deployedContracts = {};
+
+if (broadcast.transactions) {
+  for (const tx of broadcast.transactions) {
+    if (tx.transactionType === "CREATE" && tx.contractName) {
+      deployedContracts[tx.contractName] = {
+        address: tx.contractAddress,
+        name: tx.contractName,
+      };
+      console.log(`  ✅ Found ${tx.contractName}: ${tx.contractAddress}`);
+    }
+  }
+}
+
+console.log(`📋 Deployed contracts:`, Object.keys(deployedContracts));
+
+// Get RugSlot contract address
+if (!deployedContracts.RugSlot) {
+  console.error(`❌ RugSlot contract not found in deployment`);
+  console.error(`   Available contracts:`, Object.keys(deployedContracts));
+  console.error(`   Deploy RugSlot first: yarn deploy`);
+  process.exit(1);
+}
+
+const RUGSLOT_CONTRACT = deployedContracts.RugSlot.address;
+console.log(
+  `✅ Loaded RugSlot contract: ${RUGSLOT_CONTRACT} (chain ${CHAIN_ID})`
+);
+
+console.log(`💼 Facilitator Configuration:
+  Wallet: ${wallet.address}
+  Network: Base (Chain ID: ${CHAIN_ID})
+  RugSlot Contract: ${RUGSLOT_CONTRACT}
+  Port: ${PORT}
+`);
+
+// EIP-3009 TransferWithAuthorization function
+const TRANSFER_WITH_AUTHORIZATION_ABI = [
+  "function transferWithAuthorization(address from, address to, uint256 value, uint256 validAfter, uint256 validBefore, bytes32 nonce, bytes signature) external",
+  "function authorizationState(address authorizer, bytes32 nonce) external view returns (bool)",
+];
+
+// RugSlot contract ABI
+const RUGSLOT_ABI = [
+  "function commitWithMetaTransaction(address _player, bytes32 _commitHash, uint256 _nonce, uint256 _deadline, bytes _signature, address _facilitatorAddress, tuple(address from, address to, uint256 value, uint256 validAfter, uint256 validBefore, bytes32 nonce) _usdcAuth, bytes _usdcSignature) external returns (uint256)",
+  "function commitCount(address) external view returns (uint256)",
+  "function revealAndCollectFor(address _player, uint256 _commitId, uint256 _secret) external",
+];
+
+// Check facilitator balance on startup
+async function checkBalance() {
+  try {
+    // Check ETH balance
+    const balance = await provider.getBalance(wallet.address);
+    const ethBalance = ethers.formatEther(balance);
+
+    // Check USDC balance
+    const ERC20_ABI = ["function balanceOf(address) view returns (uint256)"];
+    const usdcContract = new ethers.Contract(
+      "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      ERC20_ABI,
+      provider
+    );
+    const usdcBalance = await usdcContract.balanceOf(wallet.address);
+    const usdcBalanceFormatted = ethers.formatUnits(usdcBalance, 6);
+
+    if (balance === 0n) {
+      console.error("\n" + "=".repeat(70));
+      console.error("❌ ❌ ❌  FACILITATOR HAS NO ETH FOR GAS! ❌ ❌ ❌");
+      console.error("=".repeat(70));
+      console.error(`Wallet: ${wallet.address}`);
+      console.error(`Balance: ${ethBalance} ETH`);
+      console.error(`\n→ Send at least 0.001 ETH (~$2.50) to this address!`);
+      console.error(`→ Base L2 is cheap - 0.001 ETH covers many transactions`);
+      console.error(`→ Without ETH, ALL payment settlements will FAIL!`);
+      console.error(`→ Check: https://basescan.org/address/${wallet.address}`);
+      console.error("=".repeat(70) + "\n");
+      process.exit(1);
+    } else if (parseFloat(ethBalance) < 0.0001) {
+      console.warn(
+        `⚠️  Low facilitator balance: ${ethBalance} ETH (consider refilling)`
+      );
+    } else {
+      console.log(`💰 Facilitator ETH balance: ${ethBalance} ETH`);
+    }
+    
+    console.log(`💵 Facilitator USDC balance: ${usdcBalanceFormatted} USDC (fees earned)`);
+  } catch (error) {
+    console.error("❌ Could not check facilitator balance:", error.message);
+    process.exit(1);
+  }
+}
+
+/**
+ * POST /verify
+ * Verify EIP-712 signature for EIP-3009 authorization
+ */
+app.post("/verify", async (req, res) => {
+  try {
+    const { payload, requirements } = req.body;
+
+    console.log("🔍 Verifying EIP-712 signature...");
+
+    if (!payload || !requirements) {
+      return res.status(400).json({
+        isValid: false,
+        invalidReason: "Missing payload or requirements",
+      });
+    }
+
+    const auth = payload.payload.authorization;
+    const signature = payload.payload.signature;
+
+    // Basic validation
+    if (!auth || !signature) {
+      return res.status(400).json({
+        isValid: false,
+        invalidReason: "Missing authorization or signature",
+      });
+    }
+
+    // Verify amounts match
+    if (auth.value !== requirements.maxAmountRequired) {
+      return res.status(400).json({
+        isValid: false,
+        invalidReason: `Amount mismatch: ${auth.value} vs ${requirements.maxAmountRequired}`,
+      });
+    }
+
+    // Verify recipient matches
+    if (auth.to.toLowerCase() !== requirements.payTo.toLowerCase()) {
+      return res.status(400).json({
+        isValid: false,
+        invalidReason: `Recipient mismatch: ${auth.to} vs ${requirements.payTo}`,
+      });
+    }
+
+    // Verify network matches
+    if (payload.network !== requirements.network) {
+      return res.status(400).json({
+        isValid: false,
+        invalidReason: `Network mismatch: ${payload.network} vs ${requirements.network}`,
+      });
+    }
+
+    // Build EIP-712 domain
+    // Use chainId from requirements.extra if provided (for fork compatibility)
+    const usdcChainId = requirements.extra?.chainId ? parseInt(requirements.extra.chainId) : 8453;
+    
+    const domain = {
+      name: requirements.extra?.name || "USD Coin",
+      version: requirements.extra?.version || "2",
+      chainId: usdcChainId, // Use provided chainId or default to Base mainnet
+      verifyingContract: requirements.asset,
+    };
+
+    // Build EIP-712 types
+    const types = {
+      TransferWithAuthorization: [
+        { name: "from", type: "address" },
+        { name: "to", type: "address" },
+        { name: "value", type: "uint256" },
+        { name: "validAfter", type: "uint256" },
+        { name: "validBefore", type: "uint256" },
+        { name: "nonce", type: "bytes32" },
+      ],
+    };
+
+    // Build message
+    const message = {
+      from: auth.from,
+      to: auth.to,
+      value: auth.value,
+      validAfter: auth.validAfter,
+      validBefore: auth.validBefore,
+      nonce: auth.nonce,
+    };
+
+    // Verify signature
+    const recoveredAddress = ethers.verifyTypedData(
+      domain,
+      types,
+      message,
+      signature
+    );
+
+    console.log(`📝 Signature recovered address: ${recoveredAddress}`);
+    console.log(`👤 Expected sender: ${auth.from}`);
+
+    if (recoveredAddress.toLowerCase() !== auth.from.toLowerCase()) {
+      return res.status(400).json({
+        isValid: false,
+        invalidReason: `Signature verification failed: recovered ${recoveredAddress}, expected ${auth.from}`,
+      });
+    }
+
+    // Check if nonce was already used
+    try {
+      const usdcContract = new ethers.Contract(
+        requirements.asset,
+        TRANSFER_WITH_AUTHORIZATION_ABI,
+        provider
+      );
+
+      const isUsed = await usdcContract.authorizationState(
+        auth.from,
+        auth.nonce
+      );
+      if (isUsed) {
+        return res.status(400).json({
+          isValid: false,
+          invalidReason: "Nonce already used",
+        });
+      }
+    } catch (error) {
+      console.warn("⚠️  Could not check nonce state:", error.message);
+      // Continue anyway - might be unsupported on this token
+    }
+
+    // Check validity time window
+    const now = Math.floor(Date.now() / 1000);
+    if (now < auth.validAfter) {
+      return res.status(400).json({
+        isValid: false,
+        invalidReason: `Authorization not yet valid (validAfter: ${auth.validAfter}, now: ${now})`,
+      });
+    }
+    if (now > auth.validBefore) {
+      return res.status(400).json({
+        isValid: false,
+        invalidReason: `Authorization expired (validBefore: ${auth.validBefore}, now: ${now})`,
+      });
+    }
+
+    console.log("✅ Signature verified!");
+
+    return res.status(200).json({
+      isValid: true,
+      payer: auth.from,
+    });
+  } catch (error) {
+    console.error("❌ Verification error:", error);
+    return res.status(400).json({
+      isValid: false,
+      invalidReason: error.message,
+    });
+  }
+});
+
+/**
+ * POST /settle
+ * Settle payment on-chain by calling RugSlot.commitWithMetaTransaction
+ */
+app.post("/settle", async (req, res) => {
+  try {
+    const { payload, requirements, metaCommit } = req.body;
+
+    console.log("💸 Settling payment and creating commit on-chain...");
+
+    if (!payload || !requirements || !metaCommit) {
+      return res.status(400).json({
+        success: false,
+        errorReason: "Missing payload, requirements, or metaCommit",
+      });
+    }
+
+    const auth = payload.payload.authorization;
+    const usdcSignature = payload.payload.signature;
+
+    console.log(
+      `📡 Calling RugSlot.commitWithMetaTransaction on ${RUGSLOT_CONTRACT}...`
+    );
+    console.log(`   Player: ${metaCommit.player}`);
+    console.log(`   Commit hash: ${metaCommit.commitHash}`);
+    console.log(`   Nonce: ${metaCommit.nonce}`);
+    console.log(`   Deadline: ${metaCommit.deadline}`);
+    console.log(`   USDC from: ${auth.from}`);
+    console.log(`   USDC to: ${auth.to}`);
+    console.log(`   USDC value: ${auth.value}`);
+
+    // Check client USDC balance before attempting
+    const ERC20_ABI = [
+      "function balanceOf(address account) view returns (uint256)",
+    ];
+    const usdcContract = new ethers.Contract(
+      requirements.asset,
+      ERC20_ABI,
+      provider
+    );
+    const clientBalance = await usdcContract.balanceOf(auth.from);
+    console.log(`   💰 Client USDC balance: ${clientBalance.toString()}`);
+
+    if (clientBalance < BigInt(auth.value)) {
+      throw new Error(
+        `Client has insufficient USDC: ${clientBalance.toString()} < ${
+          auth.value
+        }`
+      );
+    }
+
+    // Get expected commit ID before calling
+    const rugSlotContract = new ethers.Contract(
+      RUGSLOT_CONTRACT,
+      RUGSLOT_ABI,
+      wallet
+    );
+    const expectedCommitId = await rugSlotContract.commitCount(
+      metaCommit.player
+    );
+    console.log(`   Expected commit ID: ${expectedCommitId.toString()}`);
+
+    // Prepare USDC authorization struct
+    const usdcAuth = {
+      from: auth.from,
+      to: auth.to,
+      value: auth.value,
+      validAfter: auth.validAfter,
+      validBefore: auth.validBefore,
+      nonce: auth.nonce,
+    };
+
+    // Execute commitWithMetaTransaction
+    console.log(`\n🔄 Sending transaction...`);
+    console.log(`   DEBUG: Parameters being sent:`);
+    console.log(`   - player: ${metaCommit.player}`);
+    console.log(`   - commitHash: ${metaCommit.commitHash}`);
+    console.log(`   - nonce: ${metaCommit.nonce}`);
+    console.log(`   - deadline: ${metaCommit.deadline}`);
+    console.log(`   - signature length: ${metaCommit.signature.length}`);
+    console.log(`   - facilitator: ${wallet.address}`);
+    console.log(`   - usdcAuth.from: ${usdcAuth.from}`);
+    console.log(`   - usdcAuth.to: ${usdcAuth.to}`);
+    console.log(`   - usdcAuth.value: ${usdcAuth.value}`);
+    console.log(`   - usdcAuth.validAfter: ${usdcAuth.validAfter}`);
+    console.log(`   - usdcAuth.validBefore: ${usdcAuth.validBefore}`);
+    console.log(`   - usdcAuth.nonce: ${usdcAuth.nonce}`);
+    console.log(`   - usdcSignature length: ${usdcSignature.length}`);
+    
+    const tx = await rugSlotContract.commitWithMetaTransaction(
+      metaCommit.player,
+      metaCommit.commitHash,
+      BigInt(metaCommit.nonce),
+      BigInt(metaCommit.deadline),
+      metaCommit.signature,
+      wallet.address, // facilitator address
+      usdcAuth,
+      usdcSignature,
+      {
+        gasLimit: 500000, // Higher limit for complex transaction
+      }
+    );
+
+    console.log(`⏳ Transaction sent: ${tx.hash}`);
+    console.log(`   Waiting for confirmation...`);
+
+    const receipt = await tx.wait();
+
+    if (receipt.status === 1) {
+      console.log(`✅ Payment settled and commit created!`);
+      console.log(`   Transaction: ${tx.hash}`);
+      console.log(`   Block: ${receipt.blockNumber}`);
+      console.log(`   Gas used: ${receipt.gasUsed.toString()}`);
+      console.log(`   Commit ID: ${expectedCommitId.toString()}`);
+
+      return res.status(200).json({
+        success: true,
+        transaction: tx.hash,
+        network: requirements.network,
+        payer: auth.from,
+        blockNumber: receipt.blockNumber,
+        gasUsed: receipt.gasUsed.toString(),
+        commitId: expectedCommitId.toString(),
+      });
+    } else {
+      console.error(`❌ Transaction failed: ${tx.hash}`);
+      return res.status(400).json({
+        success: false,
+        transaction: tx.hash,
+        network: requirements.network,
+        errorReason: "Transaction reverted",
+      });
+    }
+  } catch (error) {
+    console.error("❌ Settlement error:", error);
+
+    let errorReason = error.message;
+
+    // Parse common errors
+    if (
+      error.code === "INSUFFICIENT_FUNDS" ||
+      error.message.includes("insufficient funds for gas")
+    ) {
+      errorReason = `Facilitator wallet (${wallet.address}) has no ETH for gas! Fund it with at least 0.01 ETH on Base.`;
+    } else if (error.message.includes("authorization is used")) {
+      errorReason = "USDC authorization already used (duplicate nonce)";
+    } else if (error.message.includes("authorization is expired")) {
+      errorReason = "USDC authorization expired";
+    } else if (error.message.includes("Invalid nonce")) {
+      errorReason = "Invalid MetaCommit nonce";
+    } else if (error.message.includes("Signature expired")) {
+      errorReason = "MetaCommit signature expired";
+    } else if (error.message.includes("Invalid signature")) {
+      errorReason = "Invalid MetaCommit signature";
+    } else if (error.message.includes("insufficient balance")) {
+      errorReason = "Client has insufficient USDC balance";
+    }
+
+    return res.status(400).json({
+      success: false,
+      network: req.body.requirements?.network || "base",
+      errorReason,
+    });
+  }
+});
+
+/**
+ * POST /claim
+ * Claim winnings on behalf of a player
+ */
+app.post("/claim", async (req, res) => {
+  try {
+    const { player, commitId, secret } = req.body;
+
+    console.log(`\n💰 Claiming winnings for player ${player}...`);
+    console.log(`   Commit ID: ${commitId}`);
+    console.log(`   Secret: ${secret.substring(0, 10)}...`);
+
+    if (!player || commitId === undefined || !secret) {
+      return res.status(400).json({
+        success: false,
+        errorReason: "Missing player, commitId, or secret",
+      });
+    }
+
+    // Connect to RugSlot contract
+    const rugSlotContract = new ethers.Contract(
+      RUGSLOT_CONTRACT,
+      RUGSLOT_ABI,
+      wallet
+    );
+
+    console.log(`📡 Calling revealAndCollectFor on ${RUGSLOT_CONTRACT}...`);
+
+    // Call revealAndCollectFor
+    const tx = await rugSlotContract.revealAndCollectFor(
+      player,
+      BigInt(commitId),
+      BigInt(secret),
+      {
+        gasLimit: 500000,
+      }
+    );
+
+    console.log(`⏳ Transaction sent: ${tx.hash}`);
+    console.log(`   Waiting for confirmation...`);
+
+    const receipt = await tx.wait();
+
+    if (receipt.status === 1) {
+      console.log(`✅ Winnings claimed and sent to player!`);
+      console.log(`   Transaction: ${tx.hash}`);
+      console.log(`   Block: ${receipt.blockNumber}`);
+      console.log(`   Gas used: ${receipt.gasUsed.toString()}`);
+
+      return res.status(200).json({
+        success: true,
+        transaction: tx.hash,
+        player: player,
+        blockNumber: receipt.blockNumber,
+        gasUsed: receipt.gasUsed.toString(),
+      });
+    } else {
+      console.error(`❌ Claim transaction failed: ${tx.hash}`);
+      return res.status(400).json({
+        success: false,
+        transaction: tx.hash,
+        errorReason: "Transaction reverted",
+      });
+    }
+  } catch (error) {
+    console.error("❌ Claim error:", error);
+
+    let errorReason = error.message;
+
+    // Parse common errors
+    if (
+      error.code === "INSUFFICIENT_FUNDS" ||
+      error.message.includes("insufficient funds for gas")
+    ) {
+      errorReason = `Facilitator wallet (${wallet.address}) has no ETH for gas!`;
+    } else if (error.message.includes("Commit does not exist")) {
+      errorReason = "Commit does not exist";
+    } else if (error.message.includes("Invalid secret")) {
+      errorReason = "Invalid secret";
+    } else if (error.message.includes("No winnings")) {
+      errorReason = "No winnings to claim";
+    } else if (error.message.includes("Already fully paid")) {
+      errorReason = "Winnings already claimed";
+    }
+
+    return res.status(400).json({
+      success: false,
+      errorReason,
+    });
+  }
+});
+
+/**
+ * GET /health
+ * Health check endpoint
+ */
+app.get("/health", (req, res) => {
+  res.json({
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    wallet: wallet.address,
+  });
+});
+
+// Start server
+async function start() {
+  await checkBalance();
+
+  app.listen(PORT, () => {
+    console.log(`\n🚀 x402 Facilitator running!`);
+    console.log(`   Endpoints:`);
+    console.log(`     POST http://localhost:${PORT}/verify`);
+    console.log(`     POST http://localhost:${PORT}/settle`);
+    console.log(`     POST http://localhost:${PORT}/claim`);
+    console.log(`     GET  http://localhost:${PORT}/health`);
+    console.log(`\n✅ Ready to facilitate x402 payments and auto-claim winnings!\n`);
+  });
+}
+
+start().catch((error) => {
+  console.error("Fatal error:", error);
+  process.exit(1);
+});

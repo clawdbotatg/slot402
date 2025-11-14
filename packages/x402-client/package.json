@@ -1,0 +1,22 @@
+{
+  "name": "x402-client",
+  "version": "1.0.0",
+  "description": "CLI client for testing RugSlot x402 rolls",
+  "main": "client.js",
+  "scripts": {
+    "start": "node client.js"
+  },
+  "keywords": [
+    "x402",
+    "client",
+    "rugslot",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "a2a-x402": "latest",
+    "dotenv": "^16.3.1",
+    "ethers": "^6.9.0"
+  }
+}

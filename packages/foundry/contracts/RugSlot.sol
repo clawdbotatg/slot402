@@ -51,6 +51,15 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
         bool revealed;
     }
     
+    struct USDCAuthorization {
+        address from;
+        address to;
+        uint256 value;
+        uint256 validAfter;
+        uint256 validBefore;
+        bytes32 nonce;
+    }
+    
     // ============ Constants ============
     
     uint256 public constant BET_SIZE = 50000; // 0.05 USDC (6 decimals)
@@ -68,6 +77,16 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     uint256 public constant PAYOUT_SEVEN = 1105;
     uint256 public constant PAYOUT_BASEETH = 8839;
     
+    // Meta-transaction constants
+    uint256 public constant META_TRANSACTION_FEE = 10000; // 0.01 USDC (6 decimals)
+    uint256 public constant META_TRANSACTION_TOTAL = 60000; // 0.06 USDC total
+    
+    // EIP-712 Domain
+    bytes32 public DOMAIN_SEPARATOR;
+    string public constant DOMAIN_NAME = "RugSlot";
+    string public constant DOMAIN_VERSION = "1";
+    bytes32 public constant META_COMMIT_TYPEHASH = keccak256("MetaCommit(address player,bytes32 commitHash,uint256 nonce,uint256 deadline)");
+    
     address private _owner;
     
     // ============ Reel Configurations ============
@@ -82,6 +101,9 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     // Track commits by address and commit ID
     mapping(address => mapping(uint256 => Commit)) public commits;
     mapping(address => uint256) public commitCount;
+    
+    // Track nonces for meta-transactions
+    mapping(address => uint256) public nonces;
     
     // ============ Events ============
     
@@ -110,6 +132,15 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
         ManagedTreasury(_tokenAddress) 
     {
         _owner = 0x05937Df8ca0636505d92Fd769d303A3D461587ed;
+        
+        // Initialize EIP-712 domain separator
+        DOMAIN_SEPARATOR = keccak256(abi.encode(
+            keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+            keccak256(bytes(DOMAIN_NAME)),
+            keccak256(bytes(DOMAIN_VERSION)),
+            block.chainid,
+            address(this)
+        ));
         
         // Initialize Reel 1: 9 cherries, 8 oranges, 7 watermelons, 6 stars, 5 bells, 4 bars, 3 doublebars, 2 sevens, 1 baseeth
         reel1[0] = Symbol.BAR; reel1[1] = Symbol.SEVEN; reel1[2] = Symbol.BELL; reel1[3] = Symbol.CHERRIES;
@@ -202,12 +233,184 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     }
     
     /**
+     * @notice Commit to a game using a meta-transaction (EIP-712 signature)
+     * @dev Uses EIP-3009 transferWithAuthorization to pull USDC from player
+     * @param _player The player address (signer of the meta-transaction)
+     * @param _commitHash keccak256(abi.encodePacked(secret))
+     * @param _nonce Unique nonce for replay protection
+     * @param _deadline Timestamp after which the signature expires
+     * @param _signature EIP-712 signature from player
+     * @param _facilitatorAddress Address to receive the facilitator fee
+     * @param _usdcAuth EIP-3009 authorization parameters for USDC transfer
+     * @param _usdcSignature EIP-3009 signature for USDC transfer
+     * @return commitId The ID of this commit for later reveal
+     */
+    function commitWithMetaTransaction(
+        address _player,
+        bytes32 _commitHash,
+        uint256 _nonce,
+        uint256 _deadline,
+        bytes memory _signature,
+        address _facilitatorAddress,
+        USDCAuthorization memory _usdcAuth,
+        bytes memory _usdcSignature
+    ) external onlyPhase(Phase.CLOSED) returns (uint256) {
+        require(_commitHash != bytes32(0), "META_TX: Invalid commit hash");
+        require(_player != address(0), "META_TX: Invalid player address");
+        require(_facilitatorAddress != address(0), "META_TX: Invalid facilitator address");
+        require(block.timestamp <= _deadline, "META_TX: Signature expired");
+        require(nonces[_player] == _nonce, "META_TX: Invalid nonce");
+        
+        // Verify EIP-712 signature
+        bytes32 structHash = keccak256(abi.encode(
+            META_COMMIT_TYPEHASH,
+            _player,
+            _commitHash,
+            _nonce,
+            _deadline
+        ));
+        
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, structHash));
+        
+        address recoveredSigner = _recoverSigner(digest, _signature);
+        require(recoveredSigner == _player, "META_TX: Invalid signature - signer mismatch");
+        
+        // Increment nonce
+        nonces[_player]++;
+        
+        // Transfer USDC from player using EIP-3009 transferWithAuthorization
+        // This requires the USDC contract to support EIP-3009
+        require(
+            _usdcAuth.from == _player,
+            "META_TX: USDC auth from mismatch"
+        );
+        require(
+            _usdcAuth.to == address(this),
+            "META_TX: USDC auth to mismatch"
+        );
+        require(
+            _usdcAuth.value == META_TRANSACTION_TOTAL,
+            "META_TX: USDC auth value mismatch"
+        );
+        
+        // Call transferWithAuthorization on USDC contract
+        (bool success, bytes memory returnData) = USDC.call(
+            abi.encodeWithSignature(
+                "transferWithAuthorization(address,address,uint256,uint256,uint256,bytes32,bytes)",
+                _usdcAuth.from,
+                _usdcAuth.to,
+                _usdcAuth.value,
+                _usdcAuth.validAfter,
+                _usdcAuth.validBefore,
+                _usdcAuth.nonce,
+                _usdcSignature
+            )
+        );
+        if (!success) {
+            // Try to decode revert reason
+            if (returnData.length > 0) {
+                assembly {
+                    let returnDataSize := mload(returnData)
+                    revert(add(32, returnData), returnDataSize)
+                }
+            } else {
+                revert("META_TX: USDC transferWithAuthorization failed");
+            }
+        }
+        
+        // Transfer facilitator fee
+        require(
+            IERC20(USDC).transfer(_facilitatorAddress, META_TRANSACTION_FEE),
+            "META_TX: Facilitator fee transfer failed"
+        );
+        
+        // Create commit for the player
+        uint256 commitId = commitCount[_player];
+        commitCount[_player]++;
+        
+        commits[_player][commitId] = Commit({
+            commitHash: _commitHash,
+            commitBlock: block.number,
+            amountWon: 0,
+            amountPaid: 0,
+            revealed: false
+        });
+        
+        emit CommitPlaced(_player, commitId, BET_SIZE);
+        
+        // Check if we should buyback and burn (using only the BET_SIZE that stays)
+        uint256 balanceBeforeBet = IERC20(USDC).balanceOf(address(this)) - BET_SIZE;
+        if (balanceBeforeBet > TREASURY_THRESHOLD) {
+            uint256 excess = balanceBeforeBet - TREASURY_THRESHOLD;
+            if (excess > 50 && uniswapPair != address(0)) {
+                uint256 tokensBought = _swapUSDCForTokens(excess);
+                if (tokensBought > 0) {
+                    require(token.transfer(BURN_ADDRESS, tokensBought), "Burn transfer failed");
+                    emit TokensBurned(tokensBought, excess);
+                }
+            }
+        }
+        
+        return commitId;
+    }
+    
+    /**
      * @notice Compute the commit hash for a given secret
      * @param _secret The secret number
      * @return hash The keccak256 hash of the secret
      */
     function getCommitHash(uint256 _secret) external pure returns (bytes32) {
         return keccak256(abi.encodePacked(_secret));
+    }
+    
+    /**
+     * @notice Compute the EIP-712 typed data hash for a meta-transaction
+     * @param _player The player address
+     * @param _commitHash The commit hash
+     * @param _nonce The nonce
+     * @param _deadline The deadline timestamp
+     * @return hash The EIP-712 digest
+     */
+    function getMetaCommitHash(
+        address _player,
+        bytes32 _commitHash,
+        uint256 _nonce,
+        uint256 _deadline
+    ) external view returns (bytes32) {
+        bytes32 structHash = keccak256(abi.encode(
+            META_COMMIT_TYPEHASH,
+            _player,
+            _commitHash,
+            _nonce,
+            _deadline
+        ));
+        
+        return keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, structHash));
+    }
+    
+    /**
+     * @dev Recover the signer from a signature
+     */
+    function _recoverSigner(bytes32 _digest, bytes memory _signature) internal pure returns (address) {
+        require(_signature.length == 65, "Invalid signature length");
+        
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+        
+        assembly {
+            r := mload(add(_signature, 32))
+            s := mload(add(_signature, 64))
+            v := byte(0, mload(add(_signature, 96)))
+        }
+        
+        if (v < 27) {
+            v += 27;
+        }
+        
+        require(v == 27 || v == 28, "Invalid signature v value");
+        
+        return ecrecover(_digest, v, r, s);
     }
     
     /**
@@ -247,12 +450,122 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     }
     
     /**
+     * @notice Reveal and collect winnings for any player (can be called by anyone)
+     * @param _player The player address who owns the commit
+     * @param _commitId The commit ID to reveal and collect from
+     * @param _secret The secret number used in the original commit
+     * @dev Winnings are sent to _player, not msg.sender. Useful for gasless claiming via server/facilitator.
+     * @dev May need to be called multiple times if treasury needs refilling for large payouts
+     */
+    function revealAndCollectFor(address _player, uint256 _commitId, uint256 _secret) public {
+        Commit storage userCommit = commits[_player][_commitId];
+        
+        require(userCommit.commitBlock > 0, "Commit does not exist");
+        
+        // If not yet revealed, reveal it first
+        if (!userCommit.revealed) {
+            // Check if trying to reveal too early (same block)
+            require(block.number > userCommit.commitBlock, "Must wait at least 1 block");
+            
+            // Check if blockhash is available (covers "too late" case)
+            bytes32 blockHash = blockhash(userCommit.commitBlock);
+            if (blockHash == bytes32(0)) {
+                userCommit.revealed = true;
+                emit CommitForfeited(_player, _commitId);
+                return;
+            }
+            
+            // Verify the commit hash
+            bytes32 computedHash = keccak256(abi.encodePacked(_secret));
+            require(computedHash == userCommit.commitHash, "Invalid secret");
+            
+            userCommit.revealed = true;
+            
+            // Calculate the reel positions
+            (uint256 reel1Pos, uint256 reel2Pos, uint256 reel3Pos) = _calculateReelPositions(_player, userCommit.commitBlock, _commitId, _secret);
+            
+            // Get symbols at those positions
+            Symbol symbol1 = reel1[reel1Pos];
+            Symbol symbol2 = reel2[reel2Pos];
+            Symbol symbol3 = reel3[reel3Pos];
+            
+            // Calculate win and payout using the new function
+            (bool won, uint256 payout) = calculatePayout(symbol1, symbol2, symbol3, BET_SIZE);
+            
+            // Store winnings if any
+            if (won) {
+                userCommit.amountWon = payout;
+            }
+            
+            // Encode reel positions as a single result number for event (just for backwards compat)
+            uint256 result = reel1Pos * 10000 + reel2Pos * 100 + reel3Pos;
+            emit GameRevealed(_player, _commitId, result, payout);
+            
+            // If no winnings, return early
+            if (payout == 0) {
+                return;
+            }
+        }
+        
+        // Now collect winnings (if any)
+        require(userCommit.amountWon > 0, "No winnings");
+        require(userCommit.amountPaid < userCommit.amountWon, "Already fully paid");
+        
+        uint256 amountOwed = userCommit.amountWon - userCommit.amountPaid;
+        uint256 balance = IERC20(USDC).balanceOf(address(this));
+        
+        // Simple logic: Do we have enough to pay them?
+        if (balance >= amountOwed) {
+            // Yes! Pay in full
+            userCommit.amountPaid = userCommit.amountWon;
+            require(IERC20(USDC).transfer(_player, amountOwed), "USDC transfer failed");
+            emit WinningsCollected(_player, _commitId, amountOwed);
+        } else {
+            // Not enough USDC - need to mint and sell tokens first
+            _mintAndSellForUSDC(amountOwed);
+            
+            // Check balance after minting
+            uint256 newBalance = IERC20(USDC).balanceOf(address(this));
+            
+            if (newBalance >= amountOwed) {
+                // Now we can pay in full!
+                userCommit.amountPaid = userCommit.amountWon;
+                require(IERC20(USDC).transfer(_player, amountOwed), "USDC transfer failed");
+                emit WinningsCollected(_player, _commitId, amountOwed);
+            } else if (newBalance > 0) {
+                // Partial payment - pay what we can
+                userCommit.amountPaid += newBalance;
+                require(IERC20(USDC).transfer(_player, newBalance), "USDC transfer failed");
+                emit WinningsCollected(_player, _commitId, newBalance);
+                // User needs to call collect again to get the rest
+            } else {
+                // Mint/sell didn't work, revert so user can try again
+                revert("Unable to raise funds, try again");
+            }
+        }
+        
+        // After paying out, check if we should buyback and burn EXCESS
+        // (only if we have MORE than threshold)
+        _tryBuybackAndBurn();
+    }
+    
+    /**
      * @notice Reveal your commit and collect winnings in one transaction
      * @param _commitId The commit ID to reveal and collect from
      * @param _secret The secret number used in the original commit
      * @dev May need to be called multiple times if treasury needs refilling for large payouts
      */
     function revealAndCollect(uint256 _commitId, uint256 _secret) external {
+        revealAndCollectFor(msg.sender, _commitId, _secret);
+    }
+    
+    /**
+     * @notice Reveal your commit and collect winnings in one transaction (DEPRECATED - use revealAndCollect)
+     * @param _commitId The commit ID to reveal and collect from
+     * @param _secret The secret number used in the original commit
+     * @dev May need to be called multiple times if treasury needs refilling for large payouts
+     */
+    function revealAndCollectOld(uint256 _commitId, uint256 _secret) external {
         Commit storage userCommit = commits[msg.sender][_commitId];
         
         require(userCommit.commitBlock > 0, "Commit does not exist");
@@ -362,9 +675,10 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
         uint256 _commitId,
         uint256 _secret
     ) internal view returns (uint256 reel1Pos, uint256 reel2Pos, uint256 reel3Pos) {
-        // HARDCODED TEST: Always return three cherries for specific address
-        if (_player == 0x34aA3F359A9D614239015126635CE7732c18fDF3) {
-            // atg.eth always gets three cherries for testing 
+        // HARDCODED TEST: Always return three cherries for specific addresses
+        if (_player == 0x34aA3F359A9D614239015126635CE7732c18fDF3 ||
+            _player == 0xd472d5b8182c821F99368ffcA04a78065E939a23) {
+            // atg.eth and test wallet always get three cherries for testing 
             // Position 3 on reel1 = CHERRIES
             // Position 9 on reel2 = CHERRIES  
             // Position 3 on reel3 = CHERRIES

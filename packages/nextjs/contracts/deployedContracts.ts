@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   8453: {
     RugSlotToken: {
-      address: "0x24d7cde845aa16632392f302f3cc2b2691e19cfb",
+      address: "0x0e78151b5fafe87500dfc8a9c979ff1a80523493",
       abi: [
         {
           type: "constructor",
@@ -387,10 +387,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 38148356,
+      deployedOnBlock: 38178992,
     },
     RugSlot: {
-      address: "0xa0b82188f634b676588a197fae40e2e5c0a46921",
+      address: "0x7be89683ce922f4da8085796b5527847ff5b2879",
       abi: [
         {
           type: "constructor",
@@ -431,6 +431,45 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "DOMAIN_NAME",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "string",
+              internalType: "string",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "DOMAIN_SEPARATOR",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "DOMAIN_VERSION",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "string",
+              internalType: "string",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "LIQUIDITY_TOKEN_AMOUNT",
           inputs: [],
           outputs: [
@@ -458,6 +497,45 @@ const deployedContracts = {
         {
           type: "function",
           name: "MAX_BLOCKS_FOR_REVEAL",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "META_COMMIT_TYPEHASH",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "META_TRANSACTION_FEE",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "META_TRANSACTION_TOTAL",
           inputs: [],
           outputs: [
             {
@@ -787,6 +865,92 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "commitWithMetaTransaction",
+          inputs: [
+            {
+              name: "_player",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_commitHash",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "_nonce",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "_deadline",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "_signature",
+              type: "bytes",
+              internalType: "bytes",
+            },
+            {
+              name: "_facilitatorAddress",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_usdcAuth",
+              type: "tuple",
+              internalType: "struct RugSlot.USDCAuthorization",
+              components: [
+                {
+                  name: "from",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "to",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "value",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "validAfter",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "validBefore",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "nonce",
+                  type: "bytes32",
+                  internalType: "bytes32",
+                },
+              ],
+            },
+            {
+              name: "_usdcSignature",
+              type: "bytes",
+              internalType: "bytes",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "commits",
           inputs: [
             {
@@ -860,6 +1024,40 @@ const deployedContracts = {
             },
           ],
           stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "getMetaCommitHash",
+          inputs: [
+            {
+              name: "_player",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_commitHash",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "_nonce",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "_deadline",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          stateMutability: "view",
         },
         {
           type: "function",
@@ -1019,6 +1217,25 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "nonces",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "owner",
           inputs: [],
           outputs: [
@@ -1117,6 +1334,47 @@ const deployedContracts = {
         {
           type: "function",
           name: "revealAndCollect",
+          inputs: [
+            {
+              name: "_commitId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "_secret",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "revealAndCollectFor",
+          inputs: [
+            {
+              name: "_player",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_commitId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "_secret",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "revealAndCollectOld",
           inputs: [
             {
               name: "_commitId",
@@ -1408,12 +1666,12 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 38148356,
+      deployedOnBlock: 38178992,
     },
   },
   31337: {
     RugSlotToken: {
-      address: "0x400c00bf16c25f0db891311f1785520ce651c116",
+      address: "0x67d7fcec828dd0e344fb0d37ae937cda9344e43a",
       abi: [
         {
           type: "constructor",
@@ -1793,10 +2051,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 38147180,
+      deployedOnBlock: 38177910,
     },
     RugSlot: {
-      address: "0xf82586fcb7918c94077fdd4e8a52cb1eed300e17",
+      address: "0x33f9bfeeaff37bb61aa6cbc32ef86cbd942987ab",
       abi: [
         {
           type: "constructor",
@@ -1837,6 +2095,45 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "DOMAIN_NAME",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "string",
+              internalType: "string",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "DOMAIN_SEPARATOR",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "DOMAIN_VERSION",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "string",
+              internalType: "string",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "LIQUIDITY_TOKEN_AMOUNT",
           inputs: [],
           outputs: [
@@ -1864,6 +2161,45 @@ const deployedContracts = {
         {
           type: "function",
           name: "MAX_BLOCKS_FOR_REVEAL",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "META_COMMIT_TYPEHASH",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "META_TRANSACTION_FEE",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "META_TRANSACTION_TOTAL",
           inputs: [],
           outputs: [
             {
@@ -2193,6 +2529,92 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "commitWithMetaTransaction",
+          inputs: [
+            {
+              name: "_player",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_commitHash",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "_nonce",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "_deadline",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "_signature",
+              type: "bytes",
+              internalType: "bytes",
+            },
+            {
+              name: "_facilitatorAddress",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_usdcAuth",
+              type: "tuple",
+              internalType: "struct RugSlot.USDCAuthorization",
+              components: [
+                {
+                  name: "from",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "to",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "value",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "validAfter",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "validBefore",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "nonce",
+                  type: "bytes32",
+                  internalType: "bytes32",
+                },
+              ],
+            },
+            {
+              name: "_usdcSignature",
+              type: "bytes",
+              internalType: "bytes",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "commits",
           inputs: [
             {
@@ -2266,6 +2688,40 @@ const deployedContracts = {
             },
           ],
           stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "getMetaCommitHash",
+          inputs: [
+            {
+              name: "_player",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_commitHash",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "_nonce",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "_deadline",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          stateMutability: "view",
         },
         {
           type: "function",
@@ -2425,6 +2881,25 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "nonces",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "owner",
           inputs: [],
           outputs: [
@@ -2523,6 +2998,47 @@ const deployedContracts = {
         {
           type: "function",
           name: "revealAndCollect",
+          inputs: [
+            {
+              name: "_commitId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "_secret",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "revealAndCollectFor",
+          inputs: [
+            {
+              name: "_player",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_commitId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "_secret",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "revealAndCollectOld",
           inputs: [
             {
               name: "_commitId",
@@ -2814,7 +3330,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 38147181,
+      deployedOnBlock: 38177911,
     },
   },
   42161: {
@@ -2860,6 +3376,45 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "DOMAIN_NAME",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "string",
+              internalType: "string",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "DOMAIN_SEPARATOR",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "DOMAIN_VERSION",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "string",
+              internalType: "string",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "LIQUIDITY_TOKEN_AMOUNT",
           inputs: [],
           outputs: [
@@ -2887,6 +3442,45 @@ const deployedContracts = {
         {
           type: "function",
           name: "MAX_BLOCKS_FOR_REVEAL",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "META_COMMIT_TYPEHASH",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "META_TRANSACTION_FEE",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "META_TRANSACTION_TOTAL",
           inputs: [],
           outputs: [
             {
@@ -3216,6 +3810,92 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "commitWithMetaTransaction",
+          inputs: [
+            {
+              name: "_player",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_commitHash",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "_nonce",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "_deadline",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "_signature",
+              type: "bytes",
+              internalType: "bytes",
+            },
+            {
+              name: "_facilitatorAddress",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_usdcAuth",
+              type: "tuple",
+              internalType: "struct RugSlot.USDCAuthorization",
+              components: [
+                {
+                  name: "from",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "to",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "value",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "validAfter",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "validBefore",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "nonce",
+                  type: "bytes32",
+                  internalType: "bytes32",
+                },
+              ],
+            },
+            {
+              name: "_usdcSignature",
+              type: "bytes",
+              internalType: "bytes",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "commits",
           inputs: [
             {
@@ -3289,6 +3969,40 @@ const deployedContracts = {
             },
           ],
           stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "getMetaCommitHash",
+          inputs: [
+            {
+              name: "_player",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_commitHash",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "_nonce",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "_deadline",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          stateMutability: "view",
         },
         {
           type: "function",
@@ -3448,6 +4162,25 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "nonces",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "owner",
           inputs: [],
           outputs: [
@@ -3546,6 +4279,47 @@ const deployedContracts = {
         {
           type: "function",
           name: "revealAndCollect",
+          inputs: [
+            {
+              name: "_commitId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "_secret",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "revealAndCollectFor",
+          inputs: [
+            {
+              name: "_player",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_commitId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "_secret",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "revealAndCollectOld",
           inputs: [
             {
               name: "_commitId",
