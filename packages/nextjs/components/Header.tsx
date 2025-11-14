@@ -1,13 +1,23 @@
 "use client";
 
-import React from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
+import { rainbowkitBurnerWallet } from "burner-connector";
 import { formatEther } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 import { hardhat } from "viem/chains";
+import { useAccount } from "wagmi";
+import { AddFundsModal } from "~~/app/components/AddFundsModal";
 import { FaucetButton, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import deployedContracts from "~~/contracts/deployedContracts";
-import { useScaffoldReadContract, useTargetNetwork, useWatchBalance } from "~~/hooks/scaffold-eth";
+import {
+  useScaffoldReadContract,
+  useScaffoldWriteContract,
+  useTargetNetwork,
+  useWatchBalance,
+} from "~~/hooks/scaffold-eth";
 import { useGlobalState } from "~~/services/store/store";
+import { notification } from "~~/utils/scaffold-eth";
 
 /**
  * Site header
@@ -16,6 +26,8 @@ export const Header = () => {
   const { targetNetwork } = useTargetNetwork();
   const isLocalNetwork = targetNetwork.id === hardhat.id;
   const nativeCurrencyPrice = useGlobalState(state => state.nativeCurrency.price);
+  const { isConnected, address } = useAccount();
+  const [showAddFundsModal, setShowAddFundsModal] = useState(false);
 
   const { data: currentPhase } = useScaffoldReadContract({
     contractName: "RugSlot",
@@ -32,6 +44,51 @@ export const Header = () => {
   const { data: contractEthBalance } = useWatchBalance({
     address: contractAddress as `0x${string}`,
   });
+
+  // Read user's balance in RugSlot contract
+  const { data: userBalance } = useScaffoldReadContract({
+    contractName: "RugSlot",
+    functionName: "balances",
+    args: [address],
+  });
+
+  const { writeContractAsync: writeEjectFunds } = useScaffoldWriteContract("RugSlot");
+
+  const handleWithdrawFunds = async () => {
+    if (!isConnected || !address || !userBalance || userBalance === 0n) {
+      notification.error("No balance to withdraw");
+      return;
+    }
+
+    try {
+      await writeEjectFunds({
+        functionName: "ejectFunds",
+      });
+
+      notification.success("Funds withdrawn successfully!");
+    } catch (error: any) {
+      console.error("Error withdrawing funds:", error);
+      notification.error(error?.message || "Failed to withdraw funds");
+    }
+  };
+
+  // Get or generate burner wallet address
+  const burnerWalletAddress = useMemo(() => {
+    if (typeof window === "undefined") return undefined;
+
+    try {
+      const storage = rainbowkitBurnerWallet.useSessionStorage ? sessionStorage : localStorage;
+      const burnerPK = storage?.getItem("burnerWallet.pk");
+
+      if (!burnerPK) return undefined;
+
+      const account = privateKeyToAccount(burnerPK as `0x${string}`);
+      return account.address;
+    } catch (error) {
+      console.error("Error getting burner wallet:", error);
+      return undefined;
+    }
+  }, []);
 
   return (
     <div
@@ -62,10 +119,43 @@ export const Header = () => {
           )}
         </div>
       </div>
-      <div className="navbar-end grow mr-4">
+      <div className="navbar-end grow mr-4 flex items-center gap-2">
+        {isConnected && address && (
+          <>
+            <div className="text-sm font-semibold mr-2">
+              {userBalance !== undefined ? (
+                <>
+                  Balance: {Number(formatEther(userBalance)).toFixed(6)} ETH
+                  {nativeCurrencyPrice > 0 && (
+                    <span className="opacity-70">
+                      {" "}
+                      (${(Number(formatEther(userBalance)) * nativeCurrencyPrice).toFixed(2)})
+                    </span>
+                  )}
+                </>
+              ) : (
+                <>Balance: 0.000000 ETH</>
+              )}
+            </div>
+            <button className="btn btn-sm btn-primary" onClick={() => setShowAddFundsModal(true)} type="button">
+              💰 Add Funds
+            </button>
+            {userBalance !== undefined && userBalance > 0n && (
+              <button className="btn btn-sm btn-warning" onClick={handleWithdrawFunds} type="button">
+                💸 Withdraw Funds
+              </button>
+            )}
+          </>
+        )}
         <RainbowKitCustomConnectButton />
         {isLocalNetwork && <FaucetButton />}
       </div>
+
+      <AddFundsModal
+        isOpen={showAddFundsModal}
+        onClose={() => setShowAddFundsModal(false)}
+        burnerWalletAddress={burnerWalletAddress}
+      />
     </div>
   );
 };

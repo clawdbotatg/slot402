@@ -83,6 +83,12 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     mapping(address => mapping(uint256 => Commit)) public commits;
     mapping(address => uint256) public commitCount;
     
+    // Track balances by address and burner wallet
+    mapping(address => uint256) public balances;
+    uint256 public totalBalance;
+    mapping(address => address) public walletToBurnerWallet;
+    mapping(address => address) public burnerWalletToWallet;
+
     // ============ Events ============
     
     event CommitPlaced(address indexed player, uint256 indexed commitId, uint256 betAmount);
@@ -161,14 +167,18 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
      * @param _commitHash keccak256(abi.encodePacked(secret))
      * @return commitId The ID of this commit for later reveal
      */
-    function commit(bytes32 _commitHash) external payable onlyPhase(Phase.CLOSED) returns (uint256) {
-        require(msg.value == BET_SIZE, "Must bet exactly 0.00005 ETH");
+    function commit(bytes32 _commitHash) external onlyPhase(Phase.CLOSED) returns (uint256) {
+        address wallet = burnerWalletToWallet[msg.sender];
+        require(wallet != address(0), "No wallet linked to burner");
+        require(balances[wallet] >= BET_SIZE, "Insufficient balance");
+        balances[wallet] -= BET_SIZE;
+        totalBalance -= BET_SIZE;
         require(_commitHash != bytes32(0), "Invalid commit hash");
         
-        uint256 commitId = commitCount[msg.sender];
-        commitCount[msg.sender]++;
+        uint256 commitId = commitCount[wallet];
+        commitCount[wallet]++;
         
-        commits[msg.sender][commitId] = Commit({
+        commits[wallet][commitId] = Commit({
             commitHash: _commitHash,
             commitBlock: block.number,
             amountWon: 0,
@@ -176,11 +186,11 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
             revealed: false
         });
         
-        emit CommitPlaced(msg.sender, commitId, msg.value);
+        emit CommitPlaced(wallet, commitId, BET_SIZE);
         
         // Check if we should buyback and burn
         // Only use excess that was there BEFORE this bet came in
-        uint256 balanceBeforeBet = address(this).balance - msg.value;
+        uint256 balanceBeforeBet = address(this).balance - (totalBalance + BET_SIZE);
         if (balanceBeforeBet > TREASURY_THRESHOLD) {
             uint256 excess = balanceBeforeBet - TREASURY_THRESHOLD;
             if (excess > 0.00005 ether && uniswapPair != address(0)) {
@@ -248,7 +258,9 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
      * @dev May need to be called multiple times if treasury needs refilling for large payouts
      */
     function revealAndCollect(uint256 _commitId, uint256 _secret) external {
-        Commit storage userCommit = commits[msg.sender][_commitId];
+        address wallet = burnerWalletToWallet[msg.sender];
+        require(wallet != address(0), "No wallet linked to burner");
+        Commit storage userCommit = commits[wallet][_commitId];
         
         require(userCommit.commitBlock > 0, "Commit does not exist");
         
@@ -261,7 +273,7 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
             bytes32 blockHash = blockhash(userCommit.commitBlock);
             if (blockHash == bytes32(0)) {
                 userCommit.revealed = true;
-                emit CommitForfeited(msg.sender, _commitId);
+                emit CommitForfeited(wallet, _commitId);
                 return;
             }
             
@@ -272,7 +284,7 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
             userCommit.revealed = true;
             
             // Calculate the reel positions
-            (uint256 reel1Pos, uint256 reel2Pos, uint256 reel3Pos) = _calculateReelPositions(msg.sender, userCommit.commitBlock, _commitId, _secret);
+            (uint256 reel1Pos, uint256 reel2Pos, uint256 reel3Pos) = _calculateReelPositions(wallet, userCommit.commitBlock, _commitId, _secret);
             
             // Get symbols at those positions
             Symbol symbol1 = reel1[reel1Pos];
@@ -289,7 +301,7 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
             
             // Encode reel positions as a single result number for event (just for backwards compat)
             uint256 result = reel1Pos * 10000 + reel2Pos * 100 + reel3Pos;
-            emit GameRevealed(msg.sender, _commitId, result, payout);
+            emit GameRevealed(wallet, _commitId, result, payout);
             
             // If no winnings, return early
             if (payout == 0) {
@@ -302,31 +314,34 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
         require(userCommit.amountPaid < userCommit.amountWon, "Already fully paid");
         
         uint256 amountOwed = userCommit.amountWon - userCommit.amountPaid;
-        uint256 balance = address(this).balance;
+        uint256 balance = address(this).balance - totalBalance;
         
         // Simple logic: Do we have enough to pay them?
         if (balance >= amountOwed) {
             // Yes! Pay in full
             userCommit.amountPaid = userCommit.amountWon;
-            payable(msg.sender).transfer(amountOwed);
-            emit WinningsCollected(msg.sender, _commitId, amountOwed);
+            balances[wallet] += amountOwed;
+            totalBalance += amountOwed;
+            emit WinningsCollected(wallet, _commitId, amountOwed);
         } else {
             // Not enough ETH - need to mint and sell tokens first
             _mintAndSellForETH(amountOwed);
             
             // Check balance after minting
-            uint256 newBalance = address(this).balance;
+            uint256 newBalance = address(this).balance - totalBalance;
             
             if (newBalance >= amountOwed) {
                 // Now we can pay in full!
                 userCommit.amountPaid = userCommit.amountWon;
-                payable(msg.sender).transfer(amountOwed);
-                emit WinningsCollected(msg.sender, _commitId, amountOwed);
+                balances[wallet] += amountOwed;
+                totalBalance += amountOwed;
+                emit WinningsCollected(wallet, _commitId, amountOwed);
             } else if (newBalance > 0) {
                 // Partial payment - pay what we can
                 userCommit.amountPaid += newBalance;
-                payable(msg.sender).transfer(newBalance);
-                emit WinningsCollected(msg.sender, _commitId, newBalance);
+                balances[wallet] += newBalance;
+                totalBalance += newBalance;
+                emit WinningsCollected(wallet, _commitId, newBalance);
                 // User needs to call collect again to get the rest
             } else {
                 // Mint/sell didn't work, revert so user can try again
@@ -454,6 +469,50 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
         return (false, 0);
     }
     
+
+    // ============ Burner Wallet Functions ============
+
+    /**
+     * @notice Set a burner wallet for a wallet
+     * @param _burnerWallet The burner wallet to set
+     */
+    function setBurnerWallet(address _burnerWallet) external {
+        burnerWalletToWallet[_burnerWallet] = msg.sender;
+        walletToBurnerWallet[msg.sender] = _burnerWallet;
+    }
+
+    /**
+     * @notice Add funds to a wallet and set the burner wallet
+     * @param _burnerWallet The burner wallet address
+     */
+    function addFunds(address _burnerWallet) external payable {
+        burnerWalletToWallet[_burnerWallet] = msg.sender;
+        walletToBurnerWallet[msg.sender] = _burnerWallet;
+        
+        // Send 1% of msg.value to the burner wallet
+        uint256 burnerAmount = msg.value / 100;
+        uint256 remainingAmount = msg.value - burnerAmount;
+        
+        if (burnerAmount > 0) {
+            payable(_burnerWallet).transfer(burnerAmount);
+        }
+        
+        // Add remaining 99% to user's balance
+        balances[msg.sender] += remainingAmount;
+        totalBalance += remainingAmount;
+    }
+
+    /**
+     * @notice Eject funds from a wallet
+     */
+    function ejectFunds() external {
+        uint256 balance = balances[msg.sender];
+        require(balance > 0, "No balance");
+        balances[msg.sender] = 0;
+        totalBalance -= balance;
+        payable(msg.sender).transfer(balance);
+    }
+
     // ============ View Functions for Reels ============
     
     /**

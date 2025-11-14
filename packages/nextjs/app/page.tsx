@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { OwnerControls } from "./components/OwnerControls";
 import { PayoutTable } from "./components/PayoutTable";
@@ -10,11 +10,13 @@ import { SlotMachine } from "./components/SlotMachine";
 import { TokenSalePhase } from "./components/TokenSalePhase";
 import { TokenSection } from "./components/TokenSection";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
-import { parseEther } from "viem";
+import { rainbowkitBurnerWallet } from "burner-connector";
+import { Address, createWalletClient, encodeFunctionData, http } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 import { useAccount, useBlockNumber } from "wagmi";
 import { usePublicClient } from "wagmi";
 import deployedContracts from "~~/contracts/deployedContracts";
-import { useDeployedContractInfo, useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { useDeployedContractInfo, useScaffoldReadContract, useTransactor } from "~~/hooks/scaffold-eth";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth";
 import { useCommitPolling } from "~~/hooks/useCommitPolling";
 import { useCommitStorage } from "~~/hooks/useCommitStorage";
@@ -41,6 +43,8 @@ export default function Home() {
     reel2: number;
     reel3: number;
   } | null>(null);
+  const [isAutoCollecting, setIsAutoCollecting] = useState(false);
+  const [collectionAnimationVisible, setCollectionAnimationVisible] = useState(false);
 
   // Map Symbol enum to image paths
   const symbolToImage = (symbolIndex: number): string => {
@@ -61,6 +65,30 @@ export default function Home() {
   // Get deployed contract info for contract address
   const { data: rugSlotContractInfo } = useDeployedContractInfo("RugSlot");
   const rugSlotAddress = rugSlotContractInfo?.address;
+
+  // Get or create burner wallet client
+  const burnerWalletClient = useMemo(() => {
+    if (typeof window === "undefined" || !publicClient) return null;
+
+    try {
+      const storage = rainbowkitBurnerWallet.useSessionStorage ? sessionStorage : localStorage;
+      const burnerPK = storage?.getItem("burnerWallet.pk");
+
+      if (!burnerPK) return null;
+
+      const account = privateKeyToAccount(burnerPK as `0x${string}`);
+      return createWalletClient({
+        account,
+        chain: targetNetwork,
+        transport: http(),
+      });
+    } catch (error) {
+      console.error("Error getting burner wallet:", error);
+      return null;
+    }
+  }, [publicClient, targetNetwork]);
+
+  const burnerTransactor = useTransactor(burnerWalletClient || undefined);
 
   // Load saved reel positions from localStorage on mount (universal across all users)
   useEffect(() => {
@@ -228,10 +256,6 @@ export default function Home() {
     onAddReveal: addReveal,
   });
 
-  // Write functions
-  const { writeContractAsync: writeCommit } = useScaffoldWriteContract("RugSlot");
-  const { writeContractAsync: writeRevealAndCollect } = useScaffoldWriteContract("RugSlot");
-
   const handleRollButtonClick = () => {
     if (!connectedAddress) {
       // If wallet is not connected, open the connect modal
@@ -284,13 +308,23 @@ export default function Home() {
 
       console.log("Commit hash (from contract):", commitHash);
 
-      console.log("⏳ Waiting for user to sign transaction...");
+      if (!burnerWalletClient || !burnerTransactor) {
+        throw new Error("Burner wallet not available. Please ensure burner wallet is set up.");
+      }
 
-      // Wait for user to sign transaction - this will throw if rejected or fails
-      const txHash = await writeCommit({
+      console.log("⏳ Sending transaction from burner wallet...");
+
+      // Encode the function call
+      const data = encodeFunctionData({
+        abi: contractABI,
         functionName: "commit",
         args: [commitHash as `0x${string}`],
-        value: parseEther("0.00005"),
+      });
+
+      // Send transaction from burner wallet - this will throw if rejected or fails
+      const txHash = await burnerTransactor({
+        to: contractAddress as Address,
+        data,
       });
 
       // Only reach here if transaction was successfully signed
@@ -349,13 +383,33 @@ export default function Home() {
   };
 
   const handleCollectFromReveal = async (revealCommitId: string, revealSecret: string) => {
-    if (!connectedAddress) return;
+    if (!burnerWalletClient || !burnerTransactor) {
+      console.error("Burner wallet not available for revealAndCollect");
+      return;
+    }
 
     try {
+      const chainId = targetNetwork.id as keyof typeof deployedContracts;
+      const contractAddress = (deployedContracts as any)[chainId]?.RugSlot?.address;
+      const contractABI = (deployedContracts as any)[chainId]?.RugSlot?.abi;
+
+      if (!contractAddress || !contractABI) {
+        throw new Error("Contract not found");
+      }
+
       console.log(`Collecting from commit ID ${revealCommitId}...`);
-      await writeRevealAndCollect({
+
+      // Encode the function call
+      const data = encodeFunctionData({
+        abi: contractABI,
         functionName: "revealAndCollect",
         args: [BigInt(revealCommitId), BigInt(revealSecret)],
+      });
+
+      // Send transaction from burner wallet
+      await burnerTransactor({
+        to: contractAddress as Address,
+        data,
       });
 
       console.log("Success! Checking if fully paid...");
@@ -394,6 +448,85 @@ export default function Home() {
       console.error("Error revealing and collecting:", e);
     }
   };
+
+  // Auto-collect pending reveals
+  useEffect(() => {
+    if (!connectedAddress || pendingReveals.length === 0 || isAutoCollecting || reelsAnimating) return;
+
+    const autoCollect = async () => {
+      setIsAutoCollecting(true);
+
+      // Filter out expired reveals
+      const collectableReveals = pendingReveals.filter(reveal => {
+        const blocksRemaining =
+          currentBlockNumber && reveal.commitBlock ? 256n - (currentBlockNumber - reveal.commitBlock) : 256n;
+        return blocksRemaining > 0n && reveal.amountWon - reveal.amountPaid > 0n;
+      });
+
+      if (collectableReveals.length === 0) {
+        setIsAutoCollecting(false);
+        return;
+      }
+
+      // Collect each reveal sequentially
+      for (const reveal of collectableReveals) {
+        try {
+          // Check if already fully paid before attempting to collect
+          if (!publicClient) continue;
+
+          const chainId = targetNetwork.id as keyof typeof deployedContracts;
+          const contractAddress = (deployedContracts as any)[chainId]?.RugSlot?.address;
+          const contractABI = (deployedContracts as any)[chainId]?.RugSlot?.abi;
+
+          if (contractAddress && contractABI && connectedAddress) {
+            const commitDataResult = (await publicClient.readContract({
+              address: contractAddress as `0x${string}`,
+              abi: contractABI,
+              functionName: "commits",
+              args: [connectedAddress as `0x${string}`, BigInt(reveal.commitId)],
+            })) as [string, bigint, bigint, bigint, boolean];
+
+            const amountWon = commitDataResult[2];
+            const amountPaid = commitDataResult[3];
+            const revealed = commitDataResult[4];
+
+            // Skip if already fully paid
+            if (revealed && amountPaid >= amountWon) {
+              console.log(`⚠️ Commit ${reveal.commitId} is already fully paid, skipping...`);
+              updateRevealPayment(reveal.commitId, amountPaid, amountWon);
+              continue;
+            }
+
+            console.log(`🤖 Auto-collecting from commit ID ${reveal.commitId}...`);
+            await handleCollectFromReveal(reveal.commitId, reveal.secret);
+            // Small delay between collections
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        } catch (error) {
+          console.error("Error auto-collecting:", error);
+          // If error is "Already fully paid", remove from pending reveals
+          if (error && typeof error === "object" && "message" in error) {
+            const errorMessage = String(error.message);
+            if (errorMessage.includes("Already fully paid")) {
+              console.log(`🧹 Removing already paid reveal for commit ${reveal.commitId}`);
+              removeReveal(reveal.commitId);
+            }
+          }
+        }
+      }
+
+      // Show animation after all collections are done
+      setCollectionAnimationVisible(true);
+      setTimeout(() => {
+        setCollectionAnimationVisible(false);
+      }, 3000);
+
+      setIsAutoCollecting(false);
+    };
+
+    autoCollect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectedAddress, pendingReveals, currentBlockNumber, isAutoCollecting, handleCollectFromReveal, reelsAnimating]);
 
   const handleUnjam = () => {
     console.log("🔧 Unjamming machine...");
@@ -475,6 +608,65 @@ export default function Home() {
                     />
                   </>
                 )}
+
+                {/* Auto-collect indicator */}
+                {isAutoCollecting && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "250px",
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      zIndex: 200,
+                    }}
+                    className="alert alert-info animate-pulse"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      className="stroke-current shrink-0 w-6 h-6"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M13 10V3L4 14h7v7l9-11h-7z"
+                      />
+                    </svg>
+                    <span className="font-bold">🤖 Auto-collecting pending winnings...</span>
+                  </div>
+                )}
+
+                {/* Collection complete animation */}
+                {collectionAnimationVisible && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "250px",
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      zIndex: 200,
+                    }}
+                    className="alert alert-success animate-bounce"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="stroke-current shrink-0 h-6 w-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <span className="font-bold">💰 Collections complete!</span>
+                  </div>
+                )}
+
                 <div
                   style={{ position: "absolute", top: "300px", left: "50%", transform: "translateX(-50%)", zIndex: 2 }}
                 >
