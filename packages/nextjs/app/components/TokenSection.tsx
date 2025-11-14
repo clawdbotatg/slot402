@@ -61,23 +61,23 @@ export const TokenSection = () => {
   const nativeCurrencyPrice = useGlobalState(state => state.nativeCurrency.price);
 
   // Get deployed contract info
-  const { data: contractInfo } = useDeployedContractInfo("RugSlot");
+  const { data: contractInfo } = useDeployedContractInfo("Slot402");
 
   // Read token address from contract
   const { data: tokenAddress } = useScaffoldReadContract({
-    contractName: "RugSlot",
+    contractName: "Slot402",
     functionName: "token",
   });
 
   // Read uniswap pair address from contract
   const { data: uniswapPairAddress } = useScaffoldReadContract({
-    contractName: "RugSlot",
+    contractName: "Slot402",
     functionName: "uniswapPair",
   });
 
   // Read treasury threshold
   const { data: treasuryThreshold } = useScaffoldReadContract({
-    contractName: "RugSlot",
+    contractName: "Slot402",
     functionName: "TREASURY_THRESHOLD",
   });
 
@@ -172,7 +172,7 @@ export const TokenSection = () => {
         {/* BIG TOKEN PRICE IN USDC */}
         {tokenPriceInUsdc && (
           <div className="p-8 rounded-lg border-4 border-black text-center" style={{ backgroundColor: "#1c3d45" }}>
-            <div className="text-sm text-gray-400 mb-2 uppercase tracking-wider">$RUGSLOT Token Price</div>
+            <div className="text-sm text-gray-400 mb-2 uppercase tracking-wider">$S402 Token Price</div>
             <div className="text-6xl font-bold text-green-400 mb-2">${parseFloat(tokenPriceInUsdc).toFixed(6)}</div>
             <div className="text-xl text-gray-300">USDC per token</div>
           </div>
@@ -220,8 +220,8 @@ export const TokenSection = () => {
                   <div className="text-white font-bold">${parseFloat(usdcReserve).toFixed(6)} USDC</div>
                 </div>
                 <div className="p-2 rounded" style={{ backgroundColor: "#2d5a66" }}>
-                  <div className="text-gray-300 mb-1">RUGSLOT Reserve:</div>
-                  <div className="text-white font-bold">{parseFloat(tokenReserve).toFixed(2)} RUGSLOT</div>
+                  <div className="text-gray-300 mb-1">S402 Reserve:</div>
+                  <div className="text-white font-bold">{parseFloat(tokenReserve).toFixed(2)} S402</div>
                 </div>
               </div>
             )}
@@ -348,7 +348,7 @@ export const TokenSection = () => {
                     USDC)
                   </div>
                   <div className="text-sm text-gray-300">
-                    The contract automatically buys $RUGSLOT tokens from Uniswap and burns them, reducing supply and
+                    The contract automatically buys $S402 tokens from Uniswap and burns them, reducing supply and
                     increasing scarcity.
                   </div>
                 </div>
@@ -361,7 +361,7 @@ export const TokenSection = () => {
                 <div>
                   <div className="font-bold text-yellow-300 mb-1">Treasury Deficit ({"<"} $0 USDC available)</div>
                   <div className="text-sm text-gray-300">
-                    The contract mints new $RUGSLOT tokens and sells them on Uniswap to raise USDC for covering player
+                    The contract mints new $S402 tokens and sells them on Uniswap to raise USDC for covering player
                     payouts.
                   </div>
                 </div>
@@ -378,9 +378,9 @@ export const TokenSection = () => {
             </div>
 
             <div className="text-sm text-gray-300 mt-3 p-3 rounded" style={{ backgroundColor: "#3a6b78" }}>
-              🎰 <span className="font-bold text-blue-300">Become the House:</span> By buying $RUGSLOT tokens, you
-              become part owner of the house. The slot machine has a slight house edge, and profits from this edge flow
-              back to token holders through the buyback and burn mechanism when the treasury is in surplus.
+              🎰 <span className="font-bold text-blue-300">Become the House:</span> By buying $S402 tokens, you become
+              part owner of the house. The slot machine has a slight house edge, and profits from this edge flow back to
+              token holders through the buyback and burn mechanism when the treasury is in surplus.
             </div>
           </div>
         </div>

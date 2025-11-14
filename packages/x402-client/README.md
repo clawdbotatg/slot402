@@ -1,10 +1,11 @@
-# x402 Client for RugSlot
+# x402 Client for Slot402
 
 CLI tool to test gasless slot machine rolls using the x402 payment protocol.
 
 ## Overview
 
 This client demonstrates the complete x402 payment flow:
+
 1. Requests a roll from the server (receives 402)
 2. Checks USDC balance and approves spending
 3. Signs payment authorization (EIP-3009)
@@ -13,11 +14,13 @@ This client demonstrates the complete x402 payment flow:
 ## Setup
 
 1. Install dependencies:
+
 ```bash
 yarn install
 ```
 
 2. Create `.env` file:
+
 ```bash
 # Your wallet private key (needs USDC on Base)
 PRIVATE_KEY=your_private_key_here
@@ -40,11 +43,13 @@ USDC_CONTRACT=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
 ## Running
 
 Execute a roll:
+
 ```bash
 yarn start
 ```
 
 Or from project root:
+
 ```bash
 yarn client
 ```
@@ -52,6 +57,7 @@ yarn client
 ## What It Does
 
 The client will:
+
 1. Display your wallet address and USDC balance
 2. Request a roll from the x402 server
 3. Show payment details (0.06 USDC: 0.05 bet + 0.01 fee)
@@ -115,45 +121,52 @@ SLOT ROLL RESULT
 ## Requirements
 
 ### USDC Balance
+
 - Minimum: **0.06 USDC** per roll
 - Recommended: **1.00 USDC** for multiple rolls
 
 ### Services Running
+
 - Facilitator: `yarn facilitator` (port 3001)
 - Server: `yarn server` (port 3000)
 
 ## Troubleshooting
 
 **"Insufficient USDC balance"**
+
 - Buy USDC on Base: https://app.uniswap.org/
 - Bridge from Ethereum: https://bridge.base.org/
 - Faucet (testnet only): Not available on Base Mainnet
 
 **"Failed to approve USDC spending"**
+
 - Check you have ETH for gas (even a small amount like 0.001 ETH)
 - Verify you're on Base Mainnet, not another network
 
 **"Payment verification failed"**
+
 - Check server is running: `yarn server`
 - Check facilitator is running: `yarn facilitator`
 - Verify .env configuration
 
 **"Request not found or expired"**
+
 - Request timeout (10 minutes)
 - Generate new request by running client again
 
 **"Server connection refused"**
+
 - Start the server: `yarn server`
 - Check SERVER_URL in .env (default: http://localhost:3000)
 
 ## Environment Variables
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| PRIVATE_KEY | Your wallet private key | 0x... |
-| BASE_RPC_URL | Base RPC endpoint | https://mainnet.base.org |
-| SERVER_URL | x402 server | http://localhost:3000 |
-| USDC_CONTRACT | USDC on Base | 0x833589... |
+| Variable      | Description             | Example                  |
+| ------------- | ----------------------- | ------------------------ |
+| PRIVATE_KEY   | Your wallet private key | 0x...                    |
+| BASE_RPC_URL  | Base RPC endpoint       | https://mainnet.base.org |
+| SERVER_URL    | x402 server             | http://localhost:3000    |
+| USDC_CONTRACT | USDC on Base            | 0x833589...              |
 
 ## Security Notes
 
@@ -182,4 +195,3 @@ const result = await fetch('/roll/submit', {
 ```
 
 See `client.js` for complete implementation.
-

@@ -1,5 +1,5 @@
 /**
- * x402 Payment Facilitator for RugSlot
+ * x402 Payment Facilitator for Slot402
  *
  * This facilitator verifies EIP-712 signatures and settles payments on-chain
  * using EIP-3009 transferWithAuthorization for USDC transfers
@@ -75,23 +75,23 @@ if (broadcast.transactions) {
 
 console.log(`📋 Deployed contracts:`, Object.keys(deployedContracts));
 
-// Get RugSlot contract address
-if (!deployedContracts.RugSlot) {
-  console.error(`❌ RugSlot contract not found in deployment`);
+// Get Slot402 contract address
+if (!deployedContracts.Slot402) {
+  console.error(`❌ Slot402 contract not found in deployment`);
   console.error(`   Available contracts:`, Object.keys(deployedContracts));
-  console.error(`   Deploy RugSlot first: yarn deploy`);
+  console.error(`   Deploy Slot402 first: yarn deploy`);
   process.exit(1);
 }
 
-const RUGSLOT_CONTRACT = deployedContracts.RugSlot.address;
+const RUGSLOT_CONTRACT = deployedContracts.Slot402.address;
 console.log(
-  `✅ Loaded RugSlot contract: ${RUGSLOT_CONTRACT} (chain ${CHAIN_ID})`
+  `✅ Loaded Slot402 contract: ${RUGSLOT_CONTRACT} (chain ${CHAIN_ID})`
 );
 
 console.log(`💼 Facilitator Configuration:
   Wallet: ${wallet.address}
   Network: Base (Chain ID: ${CHAIN_ID})
-  RugSlot Contract: ${RUGSLOT_CONTRACT}
+  Slot402 Contract: ${RUGSLOT_CONTRACT}
   Port: ${PORT}
 `);
 
@@ -101,12 +101,26 @@ const TRANSFER_WITH_AUTHORIZATION_ABI = [
   "function authorizationState(address authorizer, bytes32 nonce) external view returns (bool)",
 ];
 
-// RugSlot contract ABI
+// Slot402 contract ABI
 const RUGSLOT_ABI = [
   "function commitWithMetaTransaction(address _player, bytes32 _commitHash, uint256 _nonce, uint256 _deadline, bytes _signature, address _facilitatorAddress, tuple(address from, address to, uint256 value, uint256 validAfter, uint256 validBefore, bytes32 nonce) _usdcAuth, bytes _usdcSignature) external returns (uint256)",
   "function commitCount(address) external view returns (uint256)",
   "function revealAndCollectFor(address _player, uint256 _commitId, uint256 _secret) external",
 ];
+
+// Uniswap V2 Router ABI (for swapping USDC to ETH)
+const UNISWAP_V2_ROUTER_ABI = [
+  "function swapExactTokensForETH(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)",
+  "function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts)",
+];
+
+// Base network addresses
+const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+const WETH_ADDRESS = "0x4200000000000000000000000000000000000006"; // Base WETH
+const UNISWAP_V2_ROUTER = "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24"; // Base Uniswap V2 Router
+
+// ETH threshold for auto-refill (0.001 ETH)
+const ETH_REFILL_THRESHOLD = ethers.parseEther("0.001");
 
 // Check facilitator balance on startup
 async function checkBalance() {
@@ -118,7 +132,7 @@ async function checkBalance() {
     // Check USDC balance
     const ERC20_ABI = ["function balanceOf(address) view returns (uint256)"];
     const usdcContract = new ethers.Contract(
-      "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      USDC_ADDRESS,
       ERC20_ABI,
       provider
     );
@@ -144,11 +158,102 @@ async function checkBalance() {
     } else {
       console.log(`💰 Facilitator ETH balance: ${ethBalance} ETH`);
     }
-    
-    console.log(`💵 Facilitator USDC balance: ${usdcBalanceFormatted} USDC (fees earned)`);
+
+    console.log(
+      `💵 Facilitator USDC balance: ${usdcBalanceFormatted} USDC (fees earned)`
+    );
   } catch (error) {
     console.error("❌ Could not check facilitator balance:", error.message);
     process.exit(1);
+  }
+}
+
+/**
+ * Swap all USDC to ETH if ETH balance is below threshold
+ * This uses the facilitator's earned USDC fees to refill ETH for gas
+ */
+async function checkAndRefillETH() {
+  try {
+    // Check current ETH balance
+    const ethBalance = await provider.getBalance(wallet.address);
+    
+    if (ethBalance >= ETH_REFILL_THRESHOLD) {
+      // ETH balance is fine, no need to refill
+      return;
+    }
+
+    console.log(`\n⚠️  ETH balance low: ${ethers.formatEther(ethBalance)} ETH`);
+    console.log(`🔄 Attempting to swap USDC to ETH...`);
+
+    // Check USDC balance
+    const ERC20_ABI = [
+      "function balanceOf(address) view returns (uint256)",
+      "function approve(address spender, uint256 amount) external returns (bool)",
+    ];
+    const usdcContract = new ethers.Contract(
+      USDC_ADDRESS,
+      ERC20_ABI,
+      wallet
+    );
+    const usdcBalance = await usdcContract.balanceOf(wallet.address);
+
+    if (usdcBalance === 0n) {
+      console.warn(`⚠️  No USDC to swap for ETH! Facilitator needs manual ETH refill.`);
+      return;
+    }
+
+    console.log(`💵 Swapping ${ethers.formatUnits(usdcBalance, 6)} USDC to ETH...`);
+
+    // Approve Uniswap router to spend USDC
+    console.log(`   Approving Uniswap router...`);
+    const approveTx = await usdcContract.approve(UNISWAP_V2_ROUTER, usdcBalance);
+    await approveTx.wait();
+    console.log(`   ✅ Approval confirmed`);
+
+    // Prepare swap path: USDC -> WETH
+    const path = [USDC_ADDRESS, WETH_ADDRESS];
+
+    // Get expected output amount
+    const routerContract = new ethers.Contract(
+      UNISWAP_V2_ROUTER,
+      UNISWAP_V2_ROUTER_ABI,
+      wallet
+    );
+    
+    const amountsOut = await routerContract.getAmountsOut(usdcBalance, path);
+    const expectedETH = amountsOut[1];
+    console.log(`   Expected to receive: ${ethers.formatEther(expectedETH)} ETH`);
+
+    // Execute swap with 5% slippage tolerance
+    const minAmountOut = (expectedETH * 95n) / 100n;
+    const deadline = Math.floor(Date.now() / 1000) + 300; // 5 minutes
+
+    console.log(`   Executing swap...`);
+    const swapTx = await routerContract.swapExactTokensForETH(
+      usdcBalance,
+      minAmountOut,
+      path,
+      wallet.address,
+      deadline,
+      {
+        gasLimit: 300000,
+      }
+    );
+
+    console.log(`   Transaction sent: ${swapTx.hash}`);
+    const receipt = await swapTx.wait();
+
+    if (receipt.status === 1) {
+      const newEthBalance = await provider.getBalance(wallet.address);
+      console.log(`✅ Swap successful!`);
+      console.log(`   Transaction: ${swapTx.hash}`);
+      console.log(`   New ETH balance: ${ethers.formatEther(newEthBalance)} ETH`);
+    } else {
+      console.error(`❌ Swap transaction failed`);
+    }
+  } catch (error) {
+    console.error(`❌ Error during ETH refill:`, error.message);
+    // Don't throw - just warn and continue. The transaction might still work.
   }
 }
 
@@ -206,8 +311,10 @@ app.post("/verify", async (req, res) => {
 
     // Build EIP-712 domain
     // Use chainId from requirements.extra if provided (for fork compatibility)
-    const usdcChainId = requirements.extra?.chainId ? parseInt(requirements.extra.chainId) : 8453;
-    
+    const usdcChainId = requirements.extra?.chainId
+      ? parseInt(requirements.extra.chainId)
+      : 8453;
+
     const domain = {
       name: requirements.extra?.name || "USD Coin",
       version: requirements.extra?.version || "2",
@@ -310,10 +417,13 @@ app.post("/verify", async (req, res) => {
 
 /**
  * POST /settle
- * Settle payment on-chain by calling RugSlot.commitWithMetaTransaction
+ * Settle payment on-chain by calling Slot402.commitWithMetaTransaction
  */
 app.post("/settle", async (req, res) => {
   try {
+    // Check and refill ETH if needed before processing
+    await checkAndRefillETH();
+
     const { payload, requirements, metaCommit } = req.body;
 
     console.log("💸 Settling payment and creating commit on-chain...");
@@ -329,7 +439,7 @@ app.post("/settle", async (req, res) => {
     const usdcSignature = payload.payload.signature;
 
     console.log(
-      `📡 Calling RugSlot.commitWithMetaTransaction on ${RUGSLOT_CONTRACT}...`
+      `📡 Calling Slot402.commitWithMetaTransaction on ${RUGSLOT_CONTRACT}...`
     );
     console.log(`   Player: ${metaCommit.player}`);
     console.log(`   Commit hash: ${metaCommit.commitHash}`);
@@ -396,7 +506,7 @@ app.post("/settle", async (req, res) => {
     console.log(`   - usdcAuth.validBefore: ${usdcAuth.validBefore}`);
     console.log(`   - usdcAuth.nonce: ${usdcAuth.nonce}`);
     console.log(`   - usdcSignature length: ${usdcSignature.length}`);
-    
+
     const tx = await rugSlotContract.commitWithMetaTransaction(
       metaCommit.player,
       metaCommit.commitHash,
@@ -477,9 +587,13 @@ app.post("/settle", async (req, res) => {
 /**
  * POST /claim
  * Claim winnings on behalf of a player
+ * Will automatically retry multiple times if partial payments occur
  */
 app.post("/claim", async (req, res) => {
   try {
+    // Check and refill ETH if needed before processing
+    await checkAndRefillETH();
+
     const { player, commitId, secret } = req.body;
 
     console.log(`\n💰 Claiming winnings for player ${player}...`);
@@ -493,51 +607,105 @@ app.post("/claim", async (req, res) => {
       });
     }
 
-    // Connect to RugSlot contract
+    // Connect to Slot402 contract
     const rugSlotContract = new ethers.Contract(
       RUGSLOT_CONTRACT,
       RUGSLOT_ABI,
       wallet
     );
 
-    console.log(`📡 Calling revealAndCollectFor on ${RUGSLOT_CONTRACT}...`);
+    const transactions = [];
+    let attempt = 0;
+    const maxAttempts = 10; // Safety limit to prevent infinite loops
+    let totalGasUsed = 0n;
 
-    // Call revealAndCollectFor
-    const tx = await rugSlotContract.revealAndCollectFor(
-      player,
-      BigInt(commitId),
-      BigInt(secret),
-      {
-        gasLimit: 500000,
+    console.log(`📡 Starting claim process on ${RUGSLOT_CONTRACT}...`);
+
+    // Keep trying to claim until fully paid or error
+    while (attempt < maxAttempts) {
+      attempt++;
+      
+      try {
+        console.log(`\n🔄 Claim attempt ${attempt}/${maxAttempts}...`);
+        
+        // Call revealAndCollectFor
+        const tx = await rugSlotContract.revealAndCollectFor(
+          player,
+          BigInt(commitId),
+          BigInt(secret),
+          {
+            gasLimit: 500000,
+          }
+        );
+
+        console.log(`⏳ Transaction sent: ${tx.hash}`);
+        console.log(`   Waiting for confirmation...`);
+
+        const receipt = await tx.wait();
+
+        if (receipt.status === 1) {
+          console.log(`✅ Claim transaction successful!`);
+          console.log(`   Transaction: ${tx.hash}`);
+          console.log(`   Block: ${receipt.blockNumber}`);
+          console.log(`   Gas used: ${receipt.gasUsed.toString()}`);
+
+          totalGasUsed += receipt.gasUsed;
+          transactions.push({
+            hash: tx.hash,
+            blockNumber: receipt.blockNumber,
+            gasUsed: receipt.gasUsed.toString(),
+          });
+
+          // Wait 1 second before next attempt (to allow mint/sell to process)
+          if (attempt < maxAttempts) {
+            console.log(`⏸️  Waiting 1 second before next attempt...`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        } else {
+          console.error(`❌ Claim transaction failed: ${tx.hash}`);
+          break;
+        }
+      } catch (error) {
+        // Check if the error indicates we're done
+        if (error.message.includes("No winnings")) {
+          console.log(`ℹ️  No more winnings to claim (all paid out)`);
+          break;
+        } else if (error.message.includes("Already fully paid")) {
+          console.log(`✅ All winnings fully paid!`);
+          break;
+        } else if (error.message.includes("Commit does not exist")) {
+          console.error(`❌ Commit does not exist`);
+          throw error;
+        } else if (error.message.includes("Invalid secret")) {
+          console.error(`❌ Invalid secret`);
+          throw error;
+        } else {
+          // Unknown error - re-throw
+          console.error(`❌ Unexpected error on attempt ${attempt}:`, error.message);
+          throw error;
+        }
       }
-    );
+    }
 
-    console.log(`⏳ Transaction sent: ${tx.hash}`);
-    console.log(`   Waiting for confirmation...`);
-
-    const receipt = await tx.wait();
-
-    if (receipt.status === 1) {
-      console.log(`✅ Winnings claimed and sent to player!`);
-      console.log(`   Transaction: ${tx.hash}`);
-      console.log(`   Block: ${receipt.blockNumber}`);
-      console.log(`   Gas used: ${receipt.gasUsed.toString()}`);
-
-      return res.status(200).json({
-        success: true,
-        transaction: tx.hash,
-        player: player,
-        blockNumber: receipt.blockNumber,
-        gasUsed: receipt.gasUsed.toString(),
-      });
-    } else {
-      console.error(`❌ Claim transaction failed: ${tx.hash}`);
+    if (transactions.length === 0) {
       return res.status(400).json({
         success: false,
-        transaction: tx.hash,
-        errorReason: "Transaction reverted",
+        errorReason: "No claim transactions were successful",
       });
     }
+
+    console.log(`\n🎉 Claim process complete!`);
+    console.log(`   Total attempts: ${attempt}`);
+    console.log(`   Successful transactions: ${transactions.length}`);
+    console.log(`   Total gas used: ${totalGasUsed.toString()}`);
+
+    return res.status(200).json({
+      success: true,
+      player: player,
+      attempts: attempt,
+      transactions: transactions,
+      totalGasUsed: totalGasUsed.toString(),
+    });
   } catch (error) {
     console.error("❌ Claim error:", error);
 
@@ -589,7 +757,9 @@ async function start() {
     console.log(`     POST http://localhost:${PORT}/settle`);
     console.log(`     POST http://localhost:${PORT}/claim`);
     console.log(`     GET  http://localhost:${PORT}/health`);
-    console.log(`\n✅ Ready to facilitate x402 payments and auto-claim winnings!\n`);
+    console.log(
+      `\n✅ Ready to facilitate x402 payments and auto-claim winnings!\n`
+    );
   });
 }
 

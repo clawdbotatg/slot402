@@ -1,14 +1,14 @@
-# RugSlot Architecture Changes - Two Contract System
+# Slot402 Architecture Changes - Two Contract System
 
 ## Summary
 
-Successfully split the monolithic RugSlot contract into two separate contracts to solve the Uniswap V2 "INVALID_TO" error.
+Successfully split the monolithic Slot402 contract into two separate contracts to solve the Uniswap V2 "INVALID_TO" error.
 
 ## The Problem
 
-When RugSlot inherited from ERC20, it WAS the token contract. This meant:
+When Slot402 inherited from ERC20, it WAS the token contract. This meant:
 
-- The Uniswap pair was: **RugSlot/WETH**
+- The Uniswap pair was: **Slot402/WETH**
 - When trying to swap tokens, the output couldn't be sent to `address(this)` because Uniswap V2 blocks sending swap outputs to either token in the pair
 - This caused "UniswapV2: INVALID_TO" errors when winners tried to collect payouts that required minting and selling tokens
 
@@ -16,49 +16,49 @@ When RugSlot inherited from ERC20, it WAS the token contract. This meant:
 
 Split into two contracts:
 
-1. **RugSlotToken** (`packages/foundry/contracts/RugSlotToken.sol`)
+1. **Slot402Token** (`packages/foundry/contracts/Slot402Token.sol`)
 
    - Simple ERC20 token
-   - Owned by the RugSlot contract
+   - Owned by the Slot402 contract
    - Only the owner can mint tokens
 
-2. **RugSlot** (`packages/foundry/contracts/RugSlot.sol`)
+2. **Slot402** (`packages/foundry/contracts/Slot402.sol`)
    - Slot machine contract
-   - Owns the RugSlotToken
+   - Owns the Slot402Token
    - Manages all game logic, treasury, and Uniswap operations
    - Can now freely receive tokens from swaps!
 
 ## Why This Works
 
-Now the Uniswap pair is: **RugSlotToken/WETH**
+Now the Uniswap pair is: **Slot402Token/WETH**
 
-- RugSlot contract is NOT in the pair
-- RugSlot can receive tokens from swaps without restriction
-- When minting tokens to sell, RugSlot mints to itself, approves router, swaps, and receives WETH
+- Slot402 contract is NOT in the pair
+- Slot402 can receive tokens from swaps without restriction
+- When minting tokens to sell, Slot402 mints to itself, approves router, swaps, and receives WETH
 - No more "INVALID_TO" errors!
 
 ## Changes Made
 
 ### New Files
 
-- `packages/foundry/contracts/RugSlotToken.sol` - ERC20 token with owner-controlled minting
+- `packages/foundry/contracts/Slot402Token.sol` - ERC20 token with owner-controlled minting
 
 ### Modified Files
 
-- `packages/foundry/contracts/RugSlot.sol`
+- `packages/foundry/contracts/Slot402.sol`
 
   - Removed ERC20 inheritance
-  - Added RugSlotToken reference
+  - Added Slot402Token reference
   - All token operations now go through the token contract
   - Updated Uniswap paths to use `address(token)` instead of `address(this)`
 
-- `packages/foundry/script/DeployRugSlot.s.sol`
+- `packages/foundry/script/DeploySlot402.s.sol`
 
-  - Now deploys RugSlotToken first
-  - Then deploys RugSlot with token address
-  - Transfers token ownership to RugSlot
+  - Now deploys Slot402Token first
+  - Then deploys Slot402 with token address
+  - Transfers token ownership to Slot402
 
-- `packages/foundry/test/RugSlot.t.sol`
+- `packages/foundry/test/Slot402.t.sol`
 
   - Updated setUp to deploy both contracts
   - All token balance checks now use `token.balanceOf()` instead of `slot.balanceOf()`
@@ -80,29 +80,29 @@ Now the Uniswap pair is: **RugSlotToken/WETH**
 
    ```bash
    cd packages/foundry
-   forge script script/DeployRugSlot.s.sol --rpc-url arbitrum --broadcast --verify
+   forge script script/DeploySlot402.s.sol --rpc-url arbitrum --broadcast --verify
    ```
 
 2. **The deployment will**:
 
-   - Deploy RugSlotToken
-   - Deploy RugSlot with token address
-   - Transfer token ownership to RugSlot
+   - Deploy Slot402Token
+   - Deploy Slot402 with token address
+   - Transfer token ownership to Slot402
    - Log both addresses
 
 3. **Update your frontend** if needed:
    - After deployment, run `yarn generate` to update ABIs
-   - Most of your frontend should work as-is since RugSlot functions are unchanged
-   - If you display token balances directly, you may need to read from RugSlotToken contract
+   - Most of your frontend should work as-is since Slot402 functions are unchanged
+   - If you display token balances directly, you may need to read from Slot402Token contract
 
 ### Architecture Overview
 
 ```
 User (0x0593...)
   ↓ owns
-RugSlot Contract
+Slot402 Contract
   ↓ owns
-RugSlotToken Contract
+Slot402Token Contract
   ↓ forms pair with
 WETH (Uniswap V2)
 ```
@@ -111,25 +111,25 @@ WETH (Uniswap V2)
 
 **Buying Tokens (Sale Phase)**:
 
-1. User sends ETH to `RugSlot.buyTokens()`
-2. RugSlot calls `token.mint(user, amount)`
+1. User sends ETH to `Slot402.buyTokens()`
+2. Slot402 calls `token.mint(user, amount)`
 3. User receives tokens
 
 **Winning & Collecting (Active Phase)**:
 
 1. User commits and wins
 2. If treasury needs refilling:
-   - RugSlot calls `token.mint(address(this), 1 ether)`
-   - RugSlot approves router
-   - RugSlot swaps tokens for WETH via Uniswap
+   - Slot402 calls `token.mint(address(this), 1 ether)`
+   - Slot402 approves router
+   - Slot402 swaps tokens for WETH via Uniswap
    - Receives WETH, unwraps to ETH
    - **No INVALID_TO error!** ✅
-3. RugSlot pays winner in ETH
+3. Slot402 pays winner in ETH
 
 **Buyback & Burn (Excess Treasury)**:
 
-1. RugSlot wraps ETH to WETH
-2. Swaps WETH for RugSlotToken
+1. Slot402 wraps ETH to WETH
+2. Swaps WETH for Slot402Token
 3. Receives tokens to `address(this)` ✅
 4. Transfers tokens to burn address
 
@@ -137,13 +137,13 @@ WETH (Uniswap V2)
 
 ### Ownership Chain
 
-- **User** → owns RugSlot contract (can call `rug()`, `rugmint()`, etc.)
-- **RugSlot** → owns RugSlotToken contract (can mint tokens)
-- **RugSlotToken** → controls minting (only owner can mint)
+- **User** → owns Slot402 contract (can call `rug()`, `rugmint()`, etc.)
+- **Slot402** → owns Slot402Token contract (can mint tokens)
+- **Slot402Token** → controls minting (only owner can mint)
 
 ### Token Approvals
 
-When RugSlot needs to swap its tokens:
+When Slot402 needs to swap its tokens:
 
 ```solidity
 token.approve(UNISWAP_V2_ROUTER, amount);  // Approve router
@@ -152,8 +152,8 @@ token.approve(UNISWAP_V2_ROUTER, amount);  // Approve router
 
 ### Uniswap Pair
 
-- Pair: **RugSlotToken/WETH** (NOT RugSlot/WETH)
-- RugSlot contract can freely receive tokens from swaps
+- Pair: **Slot402Token/WETH** (NOT Slot402/WETH)
+- Slot402 contract can freely receive tokens from swaps
 - All liquidity operations use `address(token)` in paths
 
 ## Testing Locally

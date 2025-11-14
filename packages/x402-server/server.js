@@ -1,5 +1,5 @@
 /**
- * x402 Server for RugSlot
+ * x402 Server for Slot402
  *
  * Handles gasless slot machine rolls using x402 payment protocol
  * Server commits on behalf of user, polls for result, returns reel positions
@@ -9,10 +9,7 @@ const express = require("express");
 const cors = require("cors");
 const { ethers } = require("ethers");
 const dotenv = require("dotenv");
-const {
-  createPaymentRequirements,
-  verifyPayment,
-} = require("a2a-x402");
+const { createPaymentRequirements, verifyPayment } = require("a2a-x402");
 
 dotenv.config();
 
@@ -87,28 +84,29 @@ if (broadcast.transactions) {
 
 console.log(`📋 Deployed contracts:`, Object.keys(deployedContracts));
 
-// Get RugSlot contract address
-if (!deployedContracts.RugSlot) {
-  console.error(`❌ RugSlot contract not found in deployment`);
+// Get Slot402 contract address
+if (!deployedContracts.Slot402) {
+  console.error(`❌ Slot402 contract not found in deployment`);
   console.error(`   Available contracts:`, Object.keys(deployedContracts));
-  console.error(`   Deploy RugSlot first: yarn deploy`);
+  console.error(`   Deploy Slot402 first: yarn deploy`);
   process.exit(1);
 }
 
-const RUGSLOT_CONTRACT = deployedContracts.RugSlot.address;
+const RUGSLOT_CONTRACT = deployedContracts.Slot402.address;
 console.log(
-  `✅ Loaded RugSlot contract: ${RUGSLOT_CONTRACT} (chain ${CHAIN_ID})`
+  `✅ Loaded Slot402 contract: ${RUGSLOT_CONTRACT} (chain ${CHAIN_ID})`
 );
 
 // Initialize provider
 const provider = new ethers.JsonRpcProvider(BASE_RPC_URL);
 
 // Helper wallet for mining blocks on local fork (only used when CHAIN_ID === 31337)
-const BLOCK_MINER_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+const BLOCK_MINER_KEY =
+  "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 const blockMinerWallet = new ethers.Wallet(BLOCK_MINER_KEY, provider);
 
 console.log(`💼 Server Configuration:
-  RugSlot Contract: ${RUGSLOT_CONTRACT}
+  Slot402 Contract: ${RUGSLOT_CONTRACT}
   Chain ID: ${CHAIN_ID}
   USDC: ${USDC_CONTRACT}
   RPC: ${BASE_RPC_URL}
@@ -116,7 +114,7 @@ console.log(`💼 Server Configuration:
   Port: ${PORT}
 `);
 
-// Minimal RugSlot ABI for the functions we need
+// Minimal Slot402 ABI for the functions we need
 const RUGSLOT_ABI = [
   "function commitWithMetaTransaction(address _player, bytes32 _commitHash, uint256 _nonce, uint256 _deadline, bytes _signature, address _facilitatorAddress, tuple(address from, address to, uint256 value, uint256 validAfter, uint256 validBefore, bytes32 nonce) _usdcAuth, bytes _usdcSignature) external returns (uint256)",
   "function getCommitHash(uint256 _secret) external pure returns (bytes32)",
@@ -131,7 +129,17 @@ const RUGSLOT_ABI = [
 ];
 
 // Symbol enum mapping
-const SYMBOL_NAMES = ['CHERRIES', 'ORANGE', 'WATERMELON', 'STAR', 'BELL', 'BAR', 'DOUBLEBAR', 'SEVEN', 'BASEETH'];
+const SYMBOL_NAMES = [
+  "CHERRIES",
+  "ORANGE",
+  "WATERMELON",
+  "STAR",
+  "BELL",
+  "BAR",
+  "DOUBLEBAR",
+  "SEVEN",
+  "BASEETH",
+];
 
 // Store reels in memory (loaded at startup)
 let reel1Symbols = [];
@@ -201,14 +209,22 @@ const facilitator = new SimpleFacilitator(FACILITATOR_URL);
 async function loadReels() {
   try {
     console.log("🎰 Loading reel configurations from contract...");
-    const contract = new ethers.Contract(RUGSLOT_CONTRACT, RUGSLOT_ABI, provider);
-    
+    const contract = new ethers.Contract(
+      RUGSLOT_CONTRACT,
+      RUGSLOT_ABI,
+      provider
+    );
+
     reel1Symbols = await contract.getReel1();
     reel2Symbols = await contract.getReel2();
     reel3Symbols = await contract.getReel3();
-    
+
     console.log(`✅ Loaded ${reel1Symbols.length} symbols for each reel`);
-    console.log(`   Reel 1 sample: ${SYMBOL_NAMES[reel1Symbols[0]]}, ${SYMBOL_NAMES[reel1Symbols[1]]}, ${SYMBOL_NAMES[reel1Symbols[2]]}...`);
+    console.log(
+      `   Reel 1 sample: ${SYMBOL_NAMES[reel1Symbols[0]]}, ${
+        SYMBOL_NAMES[reel1Symbols[1]]
+      }, ${SYMBOL_NAMES[reel1Symbols[2]]}...`
+    );
   } catch (error) {
     console.error("❌ Failed to load reels:", error.message);
     console.error("   Server will continue but symbol display will not work");
@@ -224,21 +240,21 @@ async function mineBlockOnLocalFork() {
   }
 
   console.log("⛏️  Mining block on local fork...");
-  
+
   try {
     // Wait 1 second
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    
+
     // Send a dummy transaction to mine a new block
     const tx = await blockMinerWallet.sendTransaction({
       to: blockMinerWallet.address,
       value: ethers.parseEther("0.001"),
     });
-    
+
     console.log(`   Sent dummy tx: ${tx.hash}`);
     await tx.wait();
     console.log(`   ✅ Block mined!`);
-    
+
     // Wait another second
     await new Promise((resolve) => setTimeout(resolve, 1000));
   } catch (error) {
@@ -274,10 +290,10 @@ async function pollForResult(
       const symbol1 = reel1Symbols[Number(reel1Pos)];
       const symbol2 = reel2Symbols[Number(reel2Pos)];
       const symbol3 = reel3Symbols[Number(reel3Pos)];
-      
-      const symbolName1 = SYMBOL_NAMES[symbol1] || 'UNKNOWN';
-      const symbolName2 = SYMBOL_NAMES[symbol2] || 'UNKNOWN';
-      const symbolName3 = SYMBOL_NAMES[symbol3] || 'UNKNOWN';
+
+      const symbolName1 = SYMBOL_NAMES[symbol1] || "UNKNOWN";
+      const symbolName2 = SYMBOL_NAMES[symbol2] || "UNKNOWN";
+      const symbolName3 = SYMBOL_NAMES[symbol3] || "UNKNOWN";
 
       console.log(
         `✅ Result found! [ ${symbolName1} ] [ ${symbolName2} ] [ ${symbolName3} ] - ${
@@ -326,16 +342,16 @@ app.post("/roll", async (req, res) => {
       .toString(36)
       .substring(7)}`;
 
-    // Create payment requirements (payTo will be the RugSlot contract)
+    // Create payment requirements (payTo will be the Slot402 contract)
     // Note: On fork (CHAIN_ID 31337), we need to use Base mainnet chainId (8453) for USDC domain
     const usdcChainId = CHAIN_ID === "31337" ? "8453" : CHAIN_ID;
-    
+
     const requirements = await createPaymentRequirements({
       price: 0.06, // $0.06 USDC (0.05 bet + 0.01 facilitator fee)
       payToAddress: RUGSLOT_CONTRACT,
       resource: `/roll/${requestId}`,
       network: "base",
-      description: "RugSlot x402 Roll - Gasless slot machine spin",
+      description: "Slot402 x402 Roll - Gasless slot machine spin",
       mimeType: "application/json",
       scheme: "exact",
       maxTimeoutSeconds: 600,
@@ -443,7 +459,7 @@ app.post("/roll/submit", async (req, res) => {
 
     // Settle payment on-chain (facilitator will call commitWithMetaTransaction)
     console.log("💸 Settling payment and creating commit on-chain...");
-    
+
     // Call facilitator directly with metaCommit (bypassing a2a-x402 library)
     const settleResponse = await facilitator.settle(
       paymentPayload,
@@ -487,8 +503,12 @@ app.post("/roll/submit", async (req, res) => {
 
     console.log(`\n🎉 Roll complete!`);
     console.log(`   Won: ${result.won}`);
-    console.log(`   Symbols: [ ${result.symbols[0]} ] [ ${result.symbols[1]} ] [ ${result.symbols[2]} ]`);
-    console.log(`   Positions: ${result.reel1}, ${result.reel2}, ${result.reel3}`);
+    console.log(
+      `   Symbols: [ ${result.symbols[0]} ] [ ${result.symbols[1]} ] [ ${result.symbols[2]} ]`
+    );
+    console.log(
+      `   Positions: ${result.reel1}, ${result.reel2}, ${result.reel3}`
+    );
     console.log(`   Payout: ${result.payout}`);
 
     // If player won, automatically claim their winnings
@@ -501,17 +521,21 @@ app.post("/roll/submit", async (req, res) => {
           settleResponse.commitId,
           secret
         );
-        
+
         if (claimResponse.success) {
           console.log(`✅ Winnings claimed and sent to player!`);
           console.log(`   Claim TX: ${claimResponse.transaction}`);
           claimTransaction = claimResponse.transaction;
         } else {
-          console.warn(`⚠️  Could not auto-claim: ${claimResponse.errorReason}`);
+          console.warn(
+            `⚠️  Could not auto-claim: ${claimResponse.errorReason}`
+          );
         }
       } catch (claimError) {
         console.warn(`⚠️  Could not auto-claim: ${claimError.message}`);
-        console.warn(`   Player can manually claim later using revealAndCollect()`);
+        console.warn(
+          `   Player can manually claim later using revealAndCollect()`
+        );
       }
     }
 
@@ -583,9 +607,9 @@ app.get("/health", async (req, res) => {
 async function start() {
   // Load reel configurations from contract
   await loadReels();
-  
+
   app.listen(PORT, () => {
-    console.log(`\n🚀 RugSlot x402 Server running!`);
+    console.log(`\n🚀 Slot402 x402 Server running!`);
     console.log(`   API: http://localhost:${PORT}`);
     console.log(`   Health: http://localhost:${PORT}/health`);
     console.log(`\n✅ Ready to process x402 slot rolls!\n`);

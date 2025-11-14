@@ -8,13 +8,13 @@ const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // Base USDC
 
 export function TokenSalePhase() {
   const { address: connectedAddress } = useAccount();
-  const { writeContractAsync: writeBuyTokens } = useScaffoldWriteContract("RugSlot");
+  const { writeContractAsync: writeBuyTokens } = useScaffoldWriteContract("Slot402");
   const { writeContractAsync: writeUSDCApprove } = useScaffoldWriteContract("USDC");
   const { writeContractAsync: writeSwap } = useScaffoldWriteContract("UniswapV2Router");
 
   // Get contract address
-  const { data: rugSlotContractInfo } = useDeployedContractInfo("RugSlot");
-  const rugSlotAddress = rugSlotContractInfo?.address;
+  const { data: slot402ContractInfo } = useDeployedContractInfo("Slot402");
+  const slot402Address = slot402ContractInfo?.address;
 
   // Swap ETH for USDC function
   const handleSwapETHForUSDC = async () => {
@@ -46,12 +46,12 @@ export function TokenSalePhase() {
     try {
       const MAX_UINT256 = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
       console.log("🔓 Manually approving USDC...");
-      console.log("Spender (RugSlot):", rugSlotAddress);
+      console.log("Spender (Slot402):", slot402Address);
       console.log("Amount:", "MAX_UINT256");
 
       await writeUSDCApprove({
         functionName: "approve",
-        args: [rugSlotAddress as `0x${string}`, MAX_UINT256],
+        args: [slot402Address as `0x${string}`, MAX_UINT256],
       });
       console.log("✅ USDC approved successfully! You can now buy tokens.");
     } catch (error: any) {
@@ -62,13 +62,13 @@ export function TokenSalePhase() {
 
   // Read max sale tokens
   const { data: maxSaleTokens } = useScaffoldReadContract({
-    contractName: "RugSlot",
+    contractName: "Slot402",
     functionName: "maxSaleTokens",
   });
 
   // Read current total supply from the token contract
   const { data: totalSupply } = useScaffoldReadContract({
-    contractName: "RugSlotToken",
+    contractName: "Slot402Token",
     functionName: "totalSupply",
     watch: true,
   });
@@ -77,7 +77,7 @@ export function TokenSalePhase() {
   const { data: usdcAllowance } = useScaffoldReadContract({
     contractName: "USDC",
     functionName: "allowance",
-    args: [connectedAddress as `0x${string}`, rugSlotAddress as `0x${string}`],
+    args: [connectedAddress as `0x${string}`, slot402Address as `0x${string}`],
     watch: true,
   });
 
@@ -116,7 +116,7 @@ export function TokenSalePhase() {
         try {
           await writeUSDCApprove({
             functionName: "approve",
-            args: [rugSlotAddress as `0x${string}`, MAX_UINT256],
+            args: [slot402Address as `0x${string}`, MAX_UINT256],
           });
           console.log("✅ USDC approved! Waiting for confirmation...");
 

@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 /**
  * @title BaseConstants
- * @notice Shared constants for the RugSlot contracts
+ * @notice Shared constants for the Slot402 contracts
  * @dev This contract provides common constants to avoid diamond inheritance issues
  */
 abstract contract BaseConstants {

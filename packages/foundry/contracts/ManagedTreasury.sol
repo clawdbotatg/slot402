@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./RugSlotToken.sol";
+import "./Slot402Token.sol";
 import "./BaseConstants.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -13,9 +13,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 abstract contract ManagedTreasury is BaseConstants {
     // ============ Constants ============
     
-    uint256 public constant TREASURY_THRESHOLD = 1350000; // 1.35 USDC (6 decimals) - Reserve to ensure contract can cover payouts (90% of sale)
-    uint256 public constant LIQUIDITY_USDC_AMOUNT = 150000; // 0.15 USDC (6 decimals) - 10% of token sale ($0.15)
-    uint256 public constant LIQUIDITY_TOKEN_AMOUNT = 150 * 10**18; // 150 tokens: 10% of 1500 total
+    uint256 public constant TREASURY_THRESHOLD = 16350000; // 16.35 USDC (6 decimals) - Reserve to ensure contract can cover payouts (81.75% of sale)
+    uint256 public constant LIQUIDITY_USDC_AMOUNT = 3650000; // 3.65 USDC (6 decimals) - 18.25% of token sale ($20.00)
+    uint256 public constant LIQUIDITY_TOKEN_AMOUNT = 3650 * 10**18; // 3650 tokens: 18.25% of 20000 total
     
     address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
     
@@ -25,7 +25,7 @@ abstract contract ManagedTreasury is BaseConstants {
     
     // ============ State Variables ============
     
-    RugSlotToken public token;
+    Slot402Token public token;
     address public uniswapPair;
     bool public liquidityAdded;
     
@@ -52,7 +52,7 @@ abstract contract ManagedTreasury is BaseConstants {
     
     constructor(address _tokenAddress) {
         require(_tokenAddress != address(0), "Invalid token address");
-        token = RugSlotToken(_tokenAddress);
+        token = Slot402Token(_tokenAddress);
     }
     
     // ============ Treasury Management ============

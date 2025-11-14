@@ -48,8 +48,8 @@ export function useCommitPolling({
 
       try {
         const chainId = targetNetworkId as keyof typeof deployedContracts;
-        const contractAddress = (deployedContracts as any)[chainId]?.RugSlot?.address;
-        const contractABI = (deployedContracts as any)[chainId]?.RugSlot?.abi;
+        const contractAddress = (deployedContracts as any)[chainId]?.Slot402?.address;
+        const contractABI = (deployedContracts as any)[chainId]?.Slot402?.abi;
 
         if (!contractAddress || !contractABI) return false;
 

@@ -1,5 +1,5 @@
 // Slot Machine Simulation Script
-// Maps reel data from RugSlot.sol and simulates rolls
+// Maps reel data from Slot402.sol and simulates rolls
 
 // ============================================================================
 // CONFIGURATION

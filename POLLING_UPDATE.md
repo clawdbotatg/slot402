@@ -1,4 +1,4 @@
-# RugSlot Polling Update - Instant Result Feedback
+# Slot402 Polling Update - Instant Result Feedback
 
 ## What Changed
 
@@ -148,7 +148,7 @@ When ready:
 
 ```bash
 cd packages/foundry
-forge script script/DeployRugSlot.s.sol --rpc-url arbitrum --broadcast --verify
+forge script script/DeploySlot402.s.sol --rpc-url arbitrum --broadcast --verify
 ```
 
 Then update your frontend to point to the new contract addresses! 🚀

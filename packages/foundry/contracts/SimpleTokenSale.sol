@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./RugSlotToken.sol";
+import "./Slot402Token.sol";
 import "./BaseConstants.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -17,7 +17,7 @@ abstract contract SimpleTokenSale is BaseConstants {
     
     // ============ State Variables ============
     
-    RugSlotToken public sellableToken;
+    Slot402Token public sellableToken;
     Phase public currentPhase;
     uint256 public immutable tokenPrice;
     uint256 public immutable maxSaleTokens;
@@ -41,7 +41,7 @@ abstract contract SimpleTokenSale is BaseConstants {
         require(_tokenPrice > 0, "Token price must be positive");
         require(_maxSaleTokens > 0, "Max sale tokens must be positive");
         
-        sellableToken = RugSlotToken(_tokenAddress);
+        sellableToken = Slot402Token(_tokenAddress);
         tokenPrice = _tokenPrice;
         maxSaleTokens = _maxSaleTokens;
         currentPhase = Phase.OPEN;

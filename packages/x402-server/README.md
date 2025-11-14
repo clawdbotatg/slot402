@@ -1,10 +1,11 @@
-# x402 Server for RugSlot
+# x402 Server for Slot402
 
 HTTP server that handles gasless slot machine rolls using the x402 payment protocol.
 
 ## Overview
 
 This server:
+
 1. Accepts roll requests and returns 402 Payment Required
 2. Verifies and settles x402 payments via the facilitator
 3. Executes slot rolls on-chain using meta-transactions
@@ -13,16 +14,18 @@ This server:
 ## Setup
 
 1. Install dependencies:
+
 ```bash
 yarn install
 ```
 
 2. Create `.env` file:
+
 ```bash
 # Server wallet address (receives USDC payments)
 SERVER_ADDRESS=your_address_here
 
-# RugSlot contract address on Base
+# Slot402 contract address on Base
 RUGSLOT_CONTRACT=0x...
 
 # USDC contract address on Base
@@ -44,11 +47,13 @@ PRIVATE_KEY=your_private_key_here
 ## Running
 
 Start the server:
+
 ```bash
 yarn start
 ```
 
 Or from project root:
+
 ```bash
 yarn server
 ```
@@ -58,9 +63,11 @@ The server will start on port 3000 and display configuration.
 ## API Endpoints
 
 ### POST /roll
+
 Request a slot machine roll. Returns 402 Payment Required.
 
 **Request:**
+
 ```json
 {
   "player": "0x..."
@@ -68,6 +75,7 @@ Request a slot machine roll. Returns 402 Payment Required.
 ```
 
 **Response (402):**
+
 ```json
 {
   "error": "Payment Required",
@@ -89,9 +97,11 @@ Request a slot machine roll. Returns 402 Payment Required.
 ```
 
 ### POST /roll/submit
+
 Submit payment and execute slot roll.
 
 **Request:**
+
 ```json
 {
   "requestId": "roll_...",
@@ -106,6 +116,7 @@ Submit payment and execute slot roll.
 ```
 
 **Response (200):**
+
 ```json
 {
   "success": true,
@@ -128,9 +139,11 @@ Submit payment and execute slot roll.
 ```
 
 ### GET /health
+
 Health check endpoint.
 
 **Response:**
+
 ```json
 {
   "status": "healthy",
@@ -164,33 +177,37 @@ Health check endpoint.
 
 ## Environment Variables
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| SERVER_ADDRESS | Receives USDC payments | 0x... |
-| RUGSLOT_CONTRACT | RugSlot contract address | 0x... |
-| USDC_CONTRACT | USDC on Base | 0x833589... |
-| BASE_RPC_URL | Base RPC endpoint | https://mainnet.base.org |
-| FACILITATOR_URL | Facilitator service | http://localhost:3001 |
-| PORT | Server port | 3000 |
-| PRIVATE_KEY | Server wallet key | 0x... |
+| Variable         | Description              | Example                  |
+| ---------------- | ------------------------ | ------------------------ |
+| SERVER_ADDRESS   | Receives USDC payments   | 0x...                    |
+| RUGSLOT_CONTRACT | Slot402 contract address | 0x...                    |
+| USDC_CONTRACT    | USDC on Base             | 0x833589...              |
+| BASE_RPC_URL     | Base RPC endpoint        | https://mainnet.base.org |
+| FACILITATOR_URL  | Facilitator service      | http://localhost:3001    |
+| PORT             | Server port              | 3000                     |
+| PRIVATE_KEY      | Server wallet key        | 0x...                    |
 
 ## Troubleshooting
 
 **"Request not found or expired"**
+
 - RequestId doesn't exist or timeout
 - Generate new roll request
 
 **"Payment verification failed"**
+
 - Invalid signature or expired authorization
 - Check client clock sync
 - Verify USDC allowance
 
 **"Payment settlement failed"**
+
 - Facilitator has no ETH for gas
 - Client has insufficient USDC
 - Check facilitator logs
 
 **"Timeout waiting for result"**
+
 - Network congestion or RPC issues
 - Check Base network status
 - Verify RUGSLOT_CONTRACT address
@@ -204,4 +221,3 @@ Health check endpoint.
 - Add comprehensive error logging
 - Use environment-specific RPC URLs
 - Consider horizontal scaling for high traffic
-

@@ -1,41 +1,32 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./RugSlotToken.sol";
+import "./Slot402Token.sol";
 import "./SimpleTokenSale.sol";
 import "./ManagedTreasury.sol";
 
 /**
+                           #         ###    #####  
+  ####  #       ####  ##### #    #   #   #  #     # 
+ #      #      #    #   #   #    #  #     #       # 
+  ####  #      #    #   #   #    #  #     #  #####  
+      # #      #    #   #   ####### #     # #       
+ #    # #      #    #   #        #   #   #  #       
+  ####  ######  ####    #        #    ###   ####### 
+                                                              
+                                                                                     
 
-                                                  ,--,                         ,----, 
-                                               ,---.'|       ,----..         ,/   .`| 
-,-.----.                  ,----..    .--.--.   |   | :      /   /   \      ,`   .'  : 
-\    /  \           ,--, /   /   \  /  /    '. :   : |     /   .     :   ;    ;     / 
-;   :    \        ,'_ /||   :     :|  :  /`. / |   ' :    .   /   ;.  \.'___,/    ,'  
-|   | .\ :   .--. |  | :.   |  ;. /;  |  |--`  ;   ; '   .   ;   /  ` ;|    :     |   
-.   : |: | ,'_ /| :  . |.   ; /--` |  :  ;_    '   | |__ ;   |  ; \ ; |;    |.';  ;   
-|   |  \ : |  ' | |  . .;   | ;  __ \  \    `. |   | :.'||   :  | ; | '`----'  |  |   
-|   : .  / |  | ' |  | ||   : |.' .' `----.   \'   :    ;.   |  ' ' ' :    '   :  ;   
-;   | |  \ :  | | :  ' ;.   | '_.' : __ \  \  ||   |  ./ '   ;  \; /  |    |   |  '   
-|   | ;\  \|  ; ' |  | ''   ; : \  |/  /`--'  /;   : ;    \   \  ',  /     '   :  |   
-:   ' | \.':  | : ;  ; |'   | '/  .'--'.     / |   ,/      ;   :    /      ;   |.'    
-:   : :-'  '  :  `--'   \   :    /   `--'---'  '---'        \   \ .'       '---'      
-|   |.'    :  ,      .-./\   \ .'                            `---`                    
-`---'       `--`----'     `---`                                                       
 
-                           
-                                                                                      
-
-DO NOT USE THIS -- IT IS A PROTOTYPE AND FULLY RUGGABLE ON PURPOSE -- DO NOT USE THIS
+DO NOT USE THIS -- IT IS A PROTOTYPE AND FULLY RUGGABLE (for debugging in prod) ON PURPOSE -- DO NOT USE THIS
 
 
 
 
- * @title RugSlot
+ * @title Slot402
  * @notice Commit-reveal slot machine with automated treasury management via Uniswap
- * @dev Manages RugSlotToken and implements slot machine mechanics, buyback/burn, and emergency minting
+ * @dev Manages Slot402Token and implements slot machine mechanics, buyback/burn, and emergency minting
  */
-contract RugSlot is SimpleTokenSale, ManagedTreasury {
+contract Slot402 is SimpleTokenSale, ManagedTreasury {
     
     // ============ Enums ============
     
@@ -83,7 +74,7 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     
     // EIP-712 Domain
     bytes32 public DOMAIN_SEPARATOR;
-    string public constant DOMAIN_NAME = "RugSlot";
+    string public constant DOMAIN_NAME = "Slot402";
     string public constant DOMAIN_VERSION = "1";
     bytes32 public constant META_COMMIT_TYPEHASH = keccak256("MetaCommit(address player,bytes32 commitHash,uint256 nonce,uint256 deadline)");
     
@@ -128,7 +119,7 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     // ============ Constructor ============
     
     constructor(address _tokenAddress) 
-        SimpleTokenSale(_tokenAddress, 1000, 1500 * 10**18) // 1000 USDC units = 0.001 USDC per token (6 decimals); Total sale = $1.50
+        SimpleTokenSale(_tokenAddress, 1000, 20000 * 10**18) // 1000 USDC units = 0.001 USDC per token (6 decimals); Total sale = $20.00
         ManagedTreasury(_tokenAddress) 
     {
         _owner = 0x05937Df8ca0636505d92Fd769d303A3D461587ed;
@@ -559,104 +550,6 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
         revealAndCollectFor(msg.sender, _commitId, _secret);
     }
     
-    /**
-     * @notice Reveal your commit and collect winnings in one transaction (DEPRECATED - use revealAndCollect)
-     * @param _commitId The commit ID to reveal and collect from
-     * @param _secret The secret number used in the original commit
-     * @dev May need to be called multiple times if treasury needs refilling for large payouts
-     */
-    function revealAndCollectOld(uint256 _commitId, uint256 _secret) external {
-        Commit storage userCommit = commits[msg.sender][_commitId];
-        
-        require(userCommit.commitBlock > 0, "Commit does not exist");
-        
-        // If not yet revealed, reveal it first
-        if (!userCommit.revealed) {
-            // Check if trying to reveal too early (same block)
-            require(block.number > userCommit.commitBlock, "Must wait at least 1 block");
-            
-            // Check if blockhash is available (covers "too late" case)
-            bytes32 blockHash = blockhash(userCommit.commitBlock);
-            if (blockHash == bytes32(0)) {
-                userCommit.revealed = true;
-                emit CommitForfeited(msg.sender, _commitId);
-                return;
-            }
-            
-            // Verify the commit hash
-            bytes32 computedHash = keccak256(abi.encodePacked(_secret));
-            require(computedHash == userCommit.commitHash, "Invalid secret");
-            
-            userCommit.revealed = true;
-            
-            // Calculate the reel positions
-            (uint256 reel1Pos, uint256 reel2Pos, uint256 reel3Pos) = _calculateReelPositions(msg.sender, userCommit.commitBlock, _commitId, _secret);
-            
-            // Get symbols at those positions
-            Symbol symbol1 = reel1[reel1Pos];
-            Symbol symbol2 = reel2[reel2Pos];
-            Symbol symbol3 = reel3[reel3Pos];
-            
-            // Calculate win and payout using the new function
-            (bool won, uint256 payout) = calculatePayout(symbol1, symbol2, symbol3, BET_SIZE);
-            
-            // Store winnings if any
-            if (won) {
-                userCommit.amountWon = payout;
-            }
-            
-            // Encode reel positions as a single result number for event (just for backwards compat)
-            uint256 result = reel1Pos * 10000 + reel2Pos * 100 + reel3Pos;
-            emit GameRevealed(msg.sender, _commitId, result, payout);
-            
-            // If no winnings, return early
-            if (payout == 0) {
-                return;
-            }
-        }
-        
-        // Now collect winnings (if any)
-        require(userCommit.amountWon > 0, "No winnings");
-        require(userCommit.amountPaid < userCommit.amountWon, "Already fully paid");
-        
-        uint256 amountOwed = userCommit.amountWon - userCommit.amountPaid;
-        uint256 balance = IERC20(USDC).balanceOf(address(this));
-        
-        // Simple logic: Do we have enough to pay them?
-        if (balance >= amountOwed) {
-            // Yes! Pay in full
-            userCommit.amountPaid = userCommit.amountWon;
-            require(IERC20(USDC).transfer(msg.sender, amountOwed), "USDC transfer failed");
-            emit WinningsCollected(msg.sender, _commitId, amountOwed);
-        } else {
-            // Not enough USDC - need to mint and sell tokens first
-            _mintAndSellForUSDC(amountOwed);
-            
-            // Check balance after minting
-            uint256 newBalance = IERC20(USDC).balanceOf(address(this));
-            
-            if (newBalance >= amountOwed) {
-                // Now we can pay in full!
-                userCommit.amountPaid = userCommit.amountWon;
-                require(IERC20(USDC).transfer(msg.sender, amountOwed), "USDC transfer failed");
-                emit WinningsCollected(msg.sender, _commitId, amountOwed);
-            } else if (newBalance > 0) {
-                // Partial payment - pay what we can
-                userCommit.amountPaid += newBalance;
-                require(IERC20(USDC).transfer(msg.sender, newBalance), "USDC transfer failed");
-                emit WinningsCollected(msg.sender, _commitId, newBalance);
-                // User needs to call collect again to get the rest
-            } else {
-                // Mint/sell didn't work, revert so user can try again
-                revert("Unable to raise funds, try again");
-            }
-        }
-        
-        // After paying out, check if we should buyback and burn EXCESS
-        // (only if we have MORE than threshold)
-        _tryBuybackAndBurn();
-    }
-    
     // ============ Internal Game Logic ============
     
     /**
@@ -842,7 +735,7 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
      * @param _tokenAddress Address of the ERC20 token to rescue
      */
     function rescueTokens(address _tokenAddress) external onlyOwner {
-        require(_tokenAddress != address(token), "Cannot rescue RugSlotToken");
+        require(_tokenAddress != address(token), "Cannot rescue Slot402Token");
         uint256 tokenBalance = IERC20(_tokenAddress).balanceOf(address(this));
         if (tokenBalance > 0) {
             require(IERC20(_tokenAddress).transfer(_owner, tokenBalance), "Token transfer failed");
@@ -865,3 +758,4 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
         _owner = address(0);
     }
 }
+

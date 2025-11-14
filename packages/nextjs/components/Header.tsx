@@ -15,7 +15,7 @@ export const Header = () => {
   const isLocalNetwork = targetNetwork.id === hardhat.id;
 
   const { data: currentPhase } = useScaffoldReadContract({
-    contractName: "RugSlot",
+    contractName: "Slot402",
     functionName: "currentPhase",
   });
 
@@ -23,7 +23,7 @@ export const Header = () => {
 
   // Get contract address
   const chainId = targetNetwork.id as keyof typeof deployedContracts;
-  const contractAddress = (deployedContracts as any)[chainId]?.RugSlot?.address;
+  const contractAddress = (deployedContracts as any)[chainId]?.Slot402?.address;
 
   // Watch contract USDC balance
   const { data: contractUsdcBalance } = useScaffoldReadContract({
@@ -42,8 +42,8 @@ export const Header = () => {
         <Link href="/" passHref className="flex items-center gap-2 ml-4 mr-6 shrink-0">
           <div className="text-3xl">{phaseEmoji}</div>
           <div className="flex flex-col">
-            <span className="font-bold leading-tight">Based Slot</span>
-            <span className="text-xs">Provably fair, co-op-as-the-house, slot machine.</span>
+            <span className="font-bold leading-tight">Slot402.com</span>
+            <span className="text-xs">Provably fair, co-op-as-the-house, x402 slot machine.</span>
           </div>
         </Link>
         <div className="text-lg font-semibold">

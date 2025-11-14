@@ -8,21 +8,21 @@ interface OwnerControlsProps {
 }
 
 export function OwnerControls({ connectedAddress }: OwnerControlsProps) {
-  const { writeContractAsync: writeAddLiquidity } = useScaffoldWriteContract("RugSlot");
-  const { writeContractAsync: writeRemoveLiquidity } = useScaffoldWriteContract("RugSlot");
-  const { writeContractAsync: writeRug } = useScaffoldWriteContract("RugSlot");
-  const { writeContractAsync: writeRugMint } = useScaffoldWriteContract("RugSlot");
-  const { writeContractAsync: writeAdminSwapUSDCForTokens } = useScaffoldWriteContract("RugSlot");
-  const { writeContractAsync: writeAdminSwapTokensForUSDC } = useScaffoldWriteContract("RugSlot");
+  const { writeContractAsync: writeAddLiquidity } = useScaffoldWriteContract("Slot402");
+  const { writeContractAsync: writeRemoveLiquidity } = useScaffoldWriteContract("Slot402");
+  const { writeContractAsync: writeRug } = useScaffoldWriteContract("Slot402");
+  const { writeContractAsync: writeRugMint } = useScaffoldWriteContract("Slot402");
+  const { writeContractAsync: writeAdminSwapUSDCForTokens } = useScaffoldWriteContract("Slot402");
+  const { writeContractAsync: writeAdminSwapTokensForUSDC } = useScaffoldWriteContract("Slot402");
 
   // Read liquidity status from contract
   const { data: liquidityAdded } = useScaffoldReadContract({
-    contractName: "RugSlot",
+    contractName: "Slot402",
     functionName: "liquidityAdded",
   });
 
   const { data: uniswapPair } = useScaffoldReadContract({
-    contractName: "RugSlot",
+    contractName: "Slot402",
     functionName: "uniswapPair",
   });
 

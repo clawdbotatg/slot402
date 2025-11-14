@@ -24,7 +24,7 @@ const provider = new ethers.JsonRpcProvider(
 );
 const wallet = new ethers.Wallet("YOUR_PRIVATE_KEY", provider);
 
-const RUGSLOT_CONTRACT = "0x7be89683ce922f4da8085796b5527847ff5b2879";
+const S402_CONTRACT = "0x7be89683ce922f4da8085796b5527847ff5b2879";
 const SERVER_URL = "https://slot402.com/api"; // or http://localhost:8000
 
 async function roll() {
@@ -40,7 +40,7 @@ async function roll() {
 
   // 2. Get contract data
   const contract = new ethers.Contract(
-    RUGSLOT_CONTRACT,
+    S402_CONTRACT,
     [
       "function getCommitHash(uint256) pure returns (bytes32)",
       "function nonces(address) view returns (uint256)",
@@ -56,10 +56,10 @@ async function roll() {
   // 3. Sign MetaCommit (EIP-712)
   const metaCommitSig = await wallet.signTypedData(
     {
-      name: "RugSlot",
+      name: "Slot402",
       version: "1",
       chainId: 8453,
-      verifyingContract: RUGSLOT_CONTRACT,
+      verifyingContract: S402_CONTRACT,
     },
     {
       MetaCommit: [
@@ -127,17 +127,17 @@ With x402, players pay **ZERO gas**. They only pay 0.06 USDC (0.05 bet + 0.01 fa
    └─ Forwards to Facilitator
 
 3. Facilitator (has ETH for gas) calls contract:
-   └─ RugSlot.commitWithMetaTransaction()
+   └─ Slot402.commitWithMetaTransaction()
        ├─ Verifies MetaCommit signature ✅
        ├─ Calls USDC.transferWithAuthorization() (0.06 USDC)
        ├─ Pays 0.01 USDC to facilitator
        └─ Creates commit for player
 
-4. Server polls RugSlot.isWinner()
+4. Server polls Slot402.isWinner()
    └─ Returns reel positions
 
 5. If winner, Facilitator auto-claims:
-   └─ Calls RugSlot.revealAndCollectFor()
+   └─ Calls Slot402.revealAndCollectFor()
        └─ Sends USDC directly to player! 💰
 ```
 
@@ -162,8 +162,8 @@ With x402, players pay **ZERO gas**. They only pay 0.06 USDC (0.05 bet + 0.01 fa
 
 ## Smart Contracts
 
-**RugSlot**: `0x7be89683ce922f4da8085796b5527847ff5b2879` (Base)  
-**RugSlotToken**: `0x0e78151b5fafe87500dfc8a9c979ff1a80523493` (Base)
+**Slot402**: `0x7be89683ce922f4da8085796b5527847ff5b2879` (Base)  
+**Slot402Token**: `0x0e78151b5fafe87500dfc8a9c979ff1a80523493` (Base)
 
 ### Key Functions
 
@@ -256,14 +256,14 @@ yarn install
 # Deploy contracts
 yarn deploy --network base
 
-# Note the deployed RugSlot contract address
+# Note the deployed Slot402 contract address
 ```
 
 ### Activate Slot Machine
 
 1. Open http://localhost:3000/debug
 2. Connect with owner wallet (`0x05937Df8ca0636505d92Fd769d303A3D461587ed`)
-3. Find RugSlot contract
+3. Find Slot402 contract
 4. Call `closeTokenSale()` to activate slot machine
 5. Call `addLiquidity()` to create Uniswap pool
 
@@ -445,7 +445,7 @@ Health check.
                                         │ On-chain TX
                                         ↓
                              ┌─────────────────────────┐
-                             │  RugSlot Contract       │
+                             │  Slot402 Contract       │
                              │  - Verifies signatures  │
                              │  - Transfers USDC       │
                              │  - Stores commit        │
@@ -467,8 +467,8 @@ Health check.
 packages/
 ├── foundry/          # Smart contracts
 │   ├── contracts/
-│   │   ├── RugSlot.sol           # Main slot machine
-│   │   ├── RugSlotToken.sol      # ERC20 token
+│   │   ├── Slot402.sol           # Main slot machine
+│   │   ├── Slot402Token.sol      # ERC20 token
 │   │   ├── ManagedTreasury.sol   # Uniswap integration
 │   │   └── SimpleTokenSale.sol   # Token sale
 │   └── script/
@@ -551,7 +551,7 @@ yarn foundry:test
 
 # Test specific contract
 cd packages/foundry
-forge test --match-contract RugSlotTest -vvv
+forge test --match-contract Slot402Test -vvv
 ```
 
 ## Troubleshooting

@@ -10,14 +10,19 @@ import { SlotMachine } from "./components/SlotMachine";
 import { TokenSalePhase } from "./components/TokenSalePhase";
 import { TokenSection } from "./components/TokenSection";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { processPayment } from "a2a-x402";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { useAccount, useBlockNumber, useSignTypedData } from "wagmi";
 import { usePublicClient } from "wagmi";
+import { useWalletClient } from "wagmi";
 import deployedContracts from "~~/contracts/deployedContracts";
 import { useDeployedContractInfo, useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth";
 import { useCommitPolling } from "~~/hooks/useCommitPolling";
 import { useCommitStorage } from "~~/hooks/useCommitStorage";
 import { usePendingReveals } from "~~/hooks/usePendingReveals";
+import { walletClientToSigner } from "~~/utils/scaffold-eth/walletClientToSigner";
 
 export default function Home() {
   const { address: connectedAddress } = useAccount();
@@ -25,6 +30,7 @@ export default function Home() {
   const { targetNetwork } = useTargetNetwork();
   const { openConnectModal } = useConnectModal();
   const { signTypedDataAsync } = useSignTypedData();
+  const { data: walletClient } = useWalletClient();
   const [isPolling, setIsPolling] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
   const [rollError, setRollError] = useState<string | null>(null);
@@ -64,14 +70,14 @@ export default function Home() {
   };
 
   // Get deployed contract info for contract address
-  const { data: rugSlotContractInfo } = useDeployedContractInfo("RugSlot");
-  const rugSlotAddress = rugSlotContractInfo?.address;
+  const { data: slot402ContractInfo } = useDeployedContractInfo("Slot402");
+  const slot402Address = slot402ContractInfo?.address;
 
   // Load saved reel positions from localStorage on mount (universal across all users)
   useEffect(() => {
-    if (!rugSlotAddress) return;
+    if (!slot402Address) return;
 
-    const contractSuffix = rugSlotAddress.slice(0, 10); // 0x + 8 chars
+    const contractSuffix = slot402Address.slice(0, 10); // 0x + 8 chars
     const savedPositionsKey = `slot_last_reel_positions_${contractSuffix}`;
     const savedPositions = localStorage.getItem(savedPositionsKey);
 
@@ -85,7 +91,7 @@ export default function Home() {
         console.error("Failed to parse saved reel positions:", e);
       }
     }
-  }, [rugSlotAddress]);
+  }, [slot402Address]);
 
   // Custom hooks for state management
   const {
@@ -101,11 +107,11 @@ export default function Home() {
     updateResult,
     clearRollingState,
     clearCommit,
-  } = useCommitStorage(connectedAddress, rugSlotAddress);
+  } = useCommitStorage(connectedAddress, slot402Address);
 
   const { pendingReveals, addReveal, updateRevealPayment, removeReveal } = usePendingReveals(
     connectedAddress,
-    rugSlotAddress,
+    slot402Address,
   );
 
   // Watch for new blocks
@@ -113,12 +119,12 @@ export default function Home() {
 
   // Read contract state
   const { data: currentPhase } = useScaffoldReadContract({
-    contractName: "RugSlot",
+    contractName: "Slot402",
     functionName: "currentPhase",
   });
 
   const { data: commitCount } = useScaffoldReadContract({
-    contractName: "RugSlot",
+    contractName: "Slot402",
     functionName: "commitCount",
     args: [connectedAddress as `0x${string}`],
     watch: true,
@@ -126,17 +132,17 @@ export default function Home() {
 
   // Read reel configurations from contract
   const { data: contractReel1 } = useScaffoldReadContract({
-    contractName: "RugSlot",
+    contractName: "Slot402",
     functionName: "getReel1",
   });
 
   const { data: contractReel2 } = useScaffoldReadContract({
-    contractName: "RugSlot",
+    contractName: "Slot402",
     functionName: "getReel2",
   });
 
   const { data: contractReel3 } = useScaffoldReadContract({
-    contractName: "RugSlot",
+    contractName: "Slot402",
     functionName: "getReel3",
   });
 
@@ -202,7 +208,7 @@ export default function Home() {
     commitId,
     secret,
     connectedAddress,
-    contractAddress: rugSlotAddress,
+    contractAddress: slot402Address,
     publicClient,
     targetNetworkId: targetNetwork.id,
     onResult: (won, rollNum) => {
@@ -217,8 +223,8 @@ export default function Home() {
       setIsCommitting(false);
 
       // Save positions to localStorage so they persist across page reloads (universal, not user-specific)
-      if (rugSlotAddress) {
-        const contractSuffix = rugSlotAddress.slice(0, 10); // 0x + 8 chars
+      if (slot402Address) {
+        const contractSuffix = slot402Address.slice(0, 10); // 0x + 8 chars
         const savedPositionsKey = `slot_last_reel_positions_${contractSuffix}`;
         localStorage.setItem(savedPositionsKey, JSON.stringify(positions));
         console.log("💾 Saved reel positions to localStorage:", positions);
@@ -234,8 +240,8 @@ export default function Home() {
   });
 
   // Write functions
-  const { writeContractAsync: writeCommit } = useScaffoldWriteContract("RugSlot");
-  const { writeContractAsync: writeRevealAndCollect } = useScaffoldWriteContract("RugSlot");
+  const { writeContractAsync: writeCommit } = useScaffoldWriteContract("Slot402");
+  const { writeContractAsync: writeRevealAndCollect } = useScaffoldWriteContract("Slot402");
   const { writeContractAsync: writeUSDCApprove } = useScaffoldWriteContract("USDC");
   const { writeContractAsync: writeSwap } = useScaffoldWriteContract("UniswapV2Router");
 
@@ -243,7 +249,7 @@ export default function Home() {
   const { data: usdcAllowance } = useScaffoldReadContract({
     contractName: "USDC",
     functionName: "allowance",
-    args: [connectedAddress as `0x${string}`, rugSlotAddress as `0x${string}`],
+    args: [connectedAddress as `0x${string}`, slot402Address as `0x${string}`],
     watch: true,
   });
 
@@ -288,7 +294,7 @@ export default function Home() {
         console.log("💰 Need to approve USDC spending...");
         const approveTxHash = await writeUSDCApprove({
           functionName: "approve",
-          args: [rugSlotAddress as `0x${string}`, BET_SIZE * 1000n], // Approve for multiple rolls
+          args: [slot402Address as `0x${string}`, BET_SIZE * 1000n], // Approve for multiple rolls
         });
         console.log("✅ USDC approved! Hash:", approveTxHash);
         // Wait a moment for approval to be confirmed
@@ -310,8 +316,8 @@ export default function Home() {
       console.log(`This will be commit ID: ${currentCommitId} for address: ${connectedAddress}`);
 
       const chainId = targetNetwork.id as keyof typeof deployedContracts;
-      const contractAddress = (deployedContracts as any)[chainId]?.RugSlot?.address;
-      const contractABI = (deployedContracts as any)[chainId]?.RugSlot?.abi;
+      const contractAddress = (deployedContracts as any)[chainId]?.Slot402?.address;
+      const contractABI = (deployedContracts as any)[chainId]?.Slot402?.abi;
 
       if (!publicClient || !contractAddress || !contractABI) {
         throw new Error("Contract not found");
@@ -413,8 +419,8 @@ export default function Home() {
         if (!publicClient) return;
 
         const chainId = targetNetwork.id as keyof typeof deployedContracts;
-        const contractAddress = (deployedContracts as any)[chainId]?.RugSlot?.address;
-        const contractABI = (deployedContracts as any)[chainId]?.RugSlot?.abi;
+        const contractAddress = (deployedContracts as any)[chainId]?.Slot402?.address;
+        const contractABI = (deployedContracts as any)[chainId]?.Slot402?.abi;
 
         if (!contractAddress || !contractABI) return;
 
@@ -518,6 +524,7 @@ export default function Home() {
 
     setIsX402Rolling(true);
     setX402Error(null);
+    setReelPositions(null); // Clear previous reel positions BEFORE starting animations
     setReelsAnimating(true);
     setSpinCounter(prev => prev + 1);
 
@@ -568,8 +575,8 @@ export default function Home() {
       // Step 3: Generate secret and get commit data
       console.log("🎲 Generating secret and commit data...");
       const chainId = targetNetwork.id as keyof typeof deployedContracts;
-      const contractAddress = (deployedContracts as any)[chainId]?.RugSlot?.address;
-      const contractABI = (deployedContracts as any)[chainId]?.RugSlot?.abi;
+      const contractAddress = (deployedContracts as any)[chainId]?.Slot402?.address;
+      const contractABI = (deployedContracts as any)[chainId]?.Slot402?.abi;
 
       if (!publicClient || !contractAddress || !contractABI) {
         throw new Error("Contract not found");
@@ -612,7 +619,7 @@ export default function Home() {
 
       const metaCommitSignature = await signTypedDataAsync({
         domain: {
-          name: "RugSlot",
+          name: "Slot402",
           version: "1",
           chainId: BigInt(targetNetwork.id),
           verifyingContract: contractAddress as `0x${string}`,
@@ -635,42 +642,20 @@ export default function Home() {
       });
       console.log(`✅ MetaCommit signed: ${metaCommitSignature.substring(0, 20)}...`);
 
-      // Step 5: Sign EIP-3009 USDC payment authorization
+      // Step 5: Sign EIP-3009 USDC payment authorization using a2a-x402 library
       console.log("✍️  Signing payment authorization (EIP-3009)...");
 
-      // Generate random nonce for USDC authorization
-      const usdcNonce = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(
-        "",
-      )}` as `0x${string}`;
+      if (!walletClient) {
+        throw new Error("Wallet client not available");
+      }
 
-      const usdcSignature = await signTypedDataAsync({
-        domain: {
-          name: requirements.extra?.name || "USD Coin",
-          version: requirements.extra?.version || "2",
-          chainId: BigInt(requirements.extra?.chainId || 8453),
-          verifyingContract: requirements.asset as `0x${string}`,
-        },
-        types: {
-          TransferWithAuthorization: [
-            { name: "from", type: "address" },
-            { name: "to", type: "address" },
-            { name: "value", type: "uint256" },
-            { name: "validAfter", type: "uint256" },
-            { name: "validBefore", type: "uint256" },
-            { name: "nonce", type: "bytes32" },
-          ],
-        },
-        primaryType: "TransferWithAuthorization",
-        message: {
-          from: connectedAddress as `0x${string}`,
-          to: requirements.payTo as `0x${string}`,
-          value: BigInt(requirements.maxAmountRequired),
-          validAfter: BigInt(0),
-          validBefore: BigInt(Math.floor(Date.now() / 1000) + 300),
-          nonce: usdcNonce,
-        },
-      });
-      console.log(`✅ USDC authorization signed: ${usdcSignature.substring(0, 20)}...`);
+      // Convert viem WalletClient to ethers Signer for a2a-x402 library
+      const signer = walletClientToSigner(walletClient);
+
+      // Use the a2a-x402 library to create the payment signature
+      // This ensures the signature matches what the facilitator expects
+      const paymentPayload = await processPayment(requirements, signer as any);
+      console.log(`✅ Payment authorization signed`);
 
       // Step 6: Submit to server
       console.log("📤 Submitting to server...");
@@ -680,20 +665,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           requestId: paymentRequired.requestId,
-          paymentPayload: {
-            network: "base",
-            payload: {
-              authorization: {
-                from: connectedAddress,
-                to: requirements.payTo,
-                value: requirements.maxAmountRequired,
-                validAfter: 0,
-                validBefore: Math.floor(Date.now() / 1000) + 300,
-                nonce: usdcNonce,
-              },
-              signature: usdcSignature,
-            },
-          },
+          paymentPayload: paymentPayload,
           metaCommit: {
             player: connectedAddress,
             commitHash: commitHash,
@@ -832,32 +804,13 @@ export default function Home() {
                   />
                 </div>
 
-                {/* Roll Button */}
+                {/* Error Messages - Positioned separately so they don't push buttons */}
                 <div
-                  className="flex flex-col items-center gap-4"
-                  style={{ position: "absolute", top: "532px", left: "750px" }}
+                  className="flex flex-col items-center gap-2"
+                  style={{ position: "absolute", top: "680px", left: "550px", width: "373px" }}
                 >
-                  {/* User Balance Display */}
-                  {connectedAddress && usdcBalance !== undefined && (
-                    <div
-                      style={{
-                        padding: "8px 16px",
-                        backgroundColor: "#2d5a66",
-                        border: "3px solid black",
-                        borderRadius: "4px",
-                        boxShadow: "4px 4px 0 0 rgba(0, 0, 0, 0.8)",
-                        marginLeft: "35px",
-                      }}
-                    >
-                      <div style={{ fontSize: "12px", opacity: 0.8, textAlign: "center" }}>Your Balance</div>
-                      <div style={{ fontSize: "18px", fontWeight: "bold", textAlign: "center", color: "#fff" }}>
-                        ${(Number(usdcBalance) / 1e6).toFixed(2)} USDC
-                      </div>
-                    </div>
-                  )}
-
                   {rollError && (
-                    <div className="alert alert-error w-full max-w-md">
+                    <div className="alert alert-error w-full">
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className="stroke-current shrink-0 h-6 w-6"
@@ -876,7 +829,7 @@ export default function Home() {
                   )}
 
                   {x402Error && (
-                    <div className="alert alert-warning w-full max-w-md">
+                    <div className="alert alert-warning w-full">
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className="stroke-current shrink-0 h-6 w-6"
@@ -893,133 +846,163 @@ export default function Home() {
                       <span>{x402Error}</span>
                     </div>
                   )}
+                </div>
 
-                  <button
-                    className="btn btn-primary btn-lg"
+                {/* User Balance Display - Separate div */}
+                {connectedAddress && usdcBalance !== undefined && (
+                  <div
                     style={{
-                      width: "180px",
-                      height: "30px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: "1rem",
-                      borderRadius: "0",
-                      backgroundColor:
-                        !!connectedAddress && (isCommitting || isPolling || reelsAnimating || commitCount === undefined)
-                          ? "#666666"
-                          : "red",
-                      fontSize: "14px",
-                      boxShadow:
-                        !!connectedAddress && isCommitting ? "none" : "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black",
-                      position: "relative",
-                      zIndex: 10,
-                      border: "4px solid black",
-                      transform:
-                        !!connectedAddress && isCommitting
-                          ? "perspective(400px) rotateX(8deg) translateY(8px)"
-                          : "perspective(400px) rotateX(8deg)",
-                      transformStyle: "preserve-3d",
-                      transition: "transform 0.1s ease, box-shadow 0.1s ease, background-color 0.1s ease",
-                    }}
-                    onClick={handleRollButtonClick}
-                    disabled={
-                      !!connectedAddress && (isCommitting || isPolling || reelsAnimating || commitCount === undefined)
-                    }
-                    onMouseDown={e => {
-                      if (!e.currentTarget.disabled) {
-                        e.currentTarget.style.transform = "perspective(400px) rotateX(8deg) translateY(4px)";
-                        e.currentTarget.style.boxShadow = "4px 4px 0 0 rgba(0, 0, 0, 0.8), 0 4px 0 0 black";
-                      }
-                    }}
-                    onMouseUp={e => {
-                      if (!e.currentTarget.disabled) {
-                        e.currentTarget.style.transform = "perspective(400px) rotateX(8deg)";
-                        e.currentTarget.style.boxShadow = "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black";
-                      }
-                    }}
-                    onMouseLeave={e => {
-                      if (!e.currentTarget.disabled) {
-                        e.currentTarget.style.transform = "perspective(400px) rotateX(8deg)";
-                        e.currentTarget.style.boxShadow = "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black";
-                      }
+                      position: "absolute",
+                      top: "485px",
+                      left: "795px",
+                      padding: "6px 0px",
+                      minWidth: "135px",
+                      backgroundColor: "#2d5a66",
+                      border: "3px solid black",
+                      borderRadius: "4px",
+                      boxShadow: "4px 4px 0 0 rgba(0, 0, 0, 0.8)",
                     }}
                   >
-                    {!connectedAddress
-                      ? "Connect Wallet"
-                      : isCommitting || isPolling || reelsAnimating
-                        ? "Rolling..."
-                        : "Roll ($0.05 USDC)"}
-                  </button>
+                    <div style={{ fontSize: "10px", opacity: 0.8, textAlign: "center" }}>Your Balance</div>
+                    <div style={{ fontSize: "14px", fontWeight: "bold", textAlign: "center", color: "#fff" }}>
+                      ${(Number(usdcBalance) / 1e6).toFixed(2)} USDC
+                    </div>
+                  </div>
+                )}
 
-                  {/* x402 Roll Button */}
-                  <button
-                    className="btn btn-secondary btn-lg"
-                    style={{
-                      width: "180px",
-                      height: "30px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: "1rem",
-                      borderRadius: "0",
-                      backgroundColor:
+                {/* Roll Buttons Container */}
+                <div
+                  className="flex flex-col items-center gap-4"
+                  style={{ position: "absolute", top: "615px", left: "550px" }}
+                >
+                  {/* Buttons Row */}
+                  <div className="flex gap-3">
+                    {/* x402 Roll Button */}
+                    <button
+                      className="btn btn-secondary btn-lg"
+                      style={{
+                        width: "185px",
+                        height: "33px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: "1rem",
+                        borderRadius: "0",
+                        backgroundColor:
+                          !!connectedAddress &&
+                          (isX402Rolling || isCommitting || isPolling || reelsAnimating || commitCount === undefined)
+                            ? "#666666"
+                            : "#4a90e2",
+                        fontSize: "13px",
+                        boxShadow:
+                          !!connectedAddress && isX402Rolling
+                            ? "none"
+                            : "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 13px 0 0 black",
+                        position: "relative",
+                        zIndex: 10,
+                        border: "4px solid black",
+                        transform:
+                          !!connectedAddress && isX402Rolling
+                            ? "perspective(400px) rotateX(8deg) translateY(8px)"
+                            : "perspective(400px) rotateX(8deg)",
+                        transformStyle: "preserve-3d",
+                        transition: "transform 0.1s ease, box-shadow 0.1s ease, background-color 0.1s ease",
+                      }}
+                      onClick={handleX402Roll}
+                      disabled={
                         !!connectedAddress &&
                         (isX402Rolling || isCommitting || isPolling || reelsAnimating || commitCount === undefined)
-                          ? "#666666"
-                          : "#4a90e2",
-                      fontSize: "14px",
-                      boxShadow:
-                        !!connectedAddress && isX402Rolling
-                          ? "none"
-                          : "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black",
-                      position: "relative",
-                      zIndex: 10,
-                      border: "4px solid black",
-                      transform:
-                        !!connectedAddress && isX402Rolling
-                          ? "perspective(400px) rotateX(8deg) translateY(8px)"
-                          : "perspective(400px) rotateX(8deg)",
-                      transformStyle: "preserve-3d",
-                      transition: "transform 0.1s ease, box-shadow 0.1s ease, background-color 0.1s ease",
-                      marginTop: "10px",
-                    }}
-                    onClick={handleX402Roll}
-                    disabled={
-                      !!connectedAddress &&
-                      (isX402Rolling || isCommitting || isPolling || reelsAnimating || commitCount === undefined)
-                    }
-                    onMouseDown={e => {
-                      if (!e.currentTarget.disabled) {
-                        e.currentTarget.style.transform = "perspective(400px) rotateX(8deg) translateY(4px)";
-                        e.currentTarget.style.boxShadow = "4px 4px 0 0 rgba(0, 0, 0, 0.8), 0 4px 0 0 black";
                       }
-                    }}
-                    onMouseUp={e => {
-                      if (!e.currentTarget.disabled) {
-                        e.currentTarget.style.transform = "perspective(400px) rotateX(8deg)";
-                        e.currentTarget.style.boxShadow = "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black";
+                      onMouseDown={e => {
+                        if (!e.currentTarget.disabled) {
+                          e.currentTarget.style.transform = "perspective(400px) rotateX(8deg) translateY(4px)";
+                          e.currentTarget.style.boxShadow = "4px 4px 0 0 rgba(0, 0, 0, 0.8), 0 4px 0 0 black";
+                        }
+                      }}
+                      onMouseUp={e => {
+                        if (!e.currentTarget.disabled) {
+                          e.currentTarget.style.transform = "perspective(400px) rotateX(8deg)";
+                          e.currentTarget.style.boxShadow = "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black";
+                        }
+                      }}
+                      onMouseLeave={e => {
+                        if (!e.currentTarget.disabled) {
+                          e.currentTarget.style.transform = "perspective(400px) rotateX(8deg)";
+                          e.currentTarget.style.boxShadow = "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black";
+                        }
+                      }}
+                    >
+                      {!connectedAddress ? "Connect Wallet" : isX402Rolling ? "Rolling..." : "x402 ($0.06)"}
+                    </button>
+
+                    {/* Regular Roll Button */}
+                    <button
+                      className="btn btn-primary btn-lg"
+                      style={{
+                        width: "185px",
+                        height: "33px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: "1rem",
+                        borderRadius: "0",
+                        backgroundColor:
+                          !!connectedAddress &&
+                          (isCommitting || isPolling || reelsAnimating || commitCount === undefined)
+                            ? "#666666"
+                            : "red",
+                        fontSize: "13px",
+                        boxShadow:
+                          !!connectedAddress && isCommitting
+                            ? "none"
+                            : "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 13px 0 0 black",
+                        position: "relative",
+                        zIndex: 10,
+                        border: "4px solid black",
+                        transform:
+                          !!connectedAddress && isCommitting
+                            ? "perspective(400px) rotateX(8deg) translateY(8px)"
+                            : "perspective(400px) rotateX(8deg)",
+                        transformStyle: "preserve-3d",
+                        transition: "transform 0.1s ease, box-shadow 0.1s ease, background-color 0.1s ease",
+                      }}
+                      onClick={handleRollButtonClick}
+                      disabled={
+                        !!connectedAddress && (isCommitting || isPolling || reelsAnimating || commitCount === undefined)
                       }
-                    }}
-                    onMouseLeave={e => {
-                      if (!e.currentTarget.disabled) {
-                        e.currentTarget.style.transform = "perspective(400px) rotateX(8deg)";
-                        e.currentTarget.style.boxShadow = "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black";
-                      }
-                    }}
-                  >
-                    {!connectedAddress
-                      ? "Connect Wallet"
-                      : isX402Rolling
-                        ? "Rolling (x402)..."
-                        : "x402 Roll ($0.06 USDC)"}
-                  </button>
+                      onMouseDown={e => {
+                        if (!e.currentTarget.disabled) {
+                          e.currentTarget.style.transform = "perspective(400px) rotateX(8deg) translateY(4px)";
+                          e.currentTarget.style.boxShadow = "4px 4px 0 0 rgba(0, 0, 0, 0.8), 0 4px 0 0 black";
+                        }
+                      }}
+                      onMouseUp={e => {
+                        if (!e.currentTarget.disabled) {
+                          e.currentTarget.style.transform = "perspective(400px) rotateX(8deg)";
+                          e.currentTarget.style.boxShadow = "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black";
+                        }
+                      }}
+                      onMouseLeave={e => {
+                        if (!e.currentTarget.disabled) {
+                          e.currentTarget.style.transform = "perspective(400px) rotateX(8deg)";
+                          e.currentTarget.style.boxShadow = "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black";
+                        }
+                      }}
+                    >
+                      {!connectedAddress
+                        ? "Connect Wallet"
+                        : isCommitting || isPolling || reelsAnimating
+                          ? "Rolling..."
+                          : "Roll ($0.05)"}
+                    </button>
+                  </div>
 
                   {/* Swap button when insufficient USDC */}
                   {connectedAddress && usdcBalance !== undefined && usdcBalance < 50000n && (
                     <button
                       className="btn btn-warning btn-sm mt-2"
                       style={{
-                        width: "180px",
+                        width: "333px",
                         fontSize: "12px",
                         border: "2px solid black",
                       }}
@@ -1085,6 +1068,91 @@ export default function Home() {
           {currentPhase === 1 && (
             <div className="mt-8">
               <TokenSection />
+            </div>
+          )}
+
+          {/* x402 API Reference */}
+          {currentPhase === 1 && (
+            <div className="mt-12 bg-base-200 rounded-lg p-8 border-4 border-primary">
+              <h2 className="text-3xl font-bold mb-6 text-center">⚡ x402 Gasless Roll API</h2>
+
+              {/* Endpoints */}
+              <div className="bg-base-300 p-6 rounded-lg mb-6">
+                <h3 className="text-xl font-bold mb-4">📡 Endpoints</h3>
+                <div className="space-y-3 text-sm font-mono">
+                  <div className="flex items-center gap-3">
+                    <span className="badge badge-primary">POST</span>
+                    <code>/roll</code>
+                    <span className="opacity-60">- Request a roll (returns 402 Payment Required)</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="badge badge-success">POST</span>
+                    <code>/roll/submit</code>
+                    <span className="opacity-60">- Submit signatures and get result</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Client Code Example */}
+              <div className="rounded-lg overflow-hidden">
+                <div className="bg-[#1e1e1e] px-6 py-3 border-b border-gray-700">
+                  <h3 className="text-lg font-bold text-white">💻 Client Code Example</h3>
+                </div>
+                {/* @ts-ignore - Type incompatibility with React 19 */}
+                <SyntaxHighlighter
+                  language="javascript"
+                  style={vscDarkPlus}
+                  showLineNumbers={true}
+                  customStyle={{
+                    margin: 0,
+                    padding: "1.5rem",
+                    fontSize: "0.875rem",
+                    background: "#000000",
+                  }}
+                  lineNumberStyle={{
+                    minWidth: "3em",
+                    paddingRight: "1em",
+                    color: "#858585",
+                    userSelect: "none",
+                  }}
+                >
+                  {`// 1. Request roll from server
+const response = await fetch("/roll", {
+  method: "POST",
+  body: JSON.stringify({ player: userAddress })
+});
+
+// 2. Get payment details (402 response)
+const { requestId, accepts } = await response.json();
+
+// 3. Generate secret and commit hash
+const secret = Math.floor(Math.random() * MAX_SAFE_INT);
+const commitHash = await contract.getCommitHash(secret);
+
+// 4. Sign MetaCommit (EIP-712)
+const metaSig = await signTypedDataAsync({
+  domain, types, message
+});
+
+// 5. Sign USDC payment (EIP-3009)
+const paymentPayload = await processPayment(accepts[0]);
+
+// 6. Submit and get result
+const result = await fetch("/roll/submit", {
+  method: "POST",
+  body: JSON.stringify({
+    requestId,
+    paymentPayload,
+    metaCommit: { player, commitHash, nonce, signature },
+    secret
+  })
+}).then(r => r.json());
+
+// Done! ✨
+console.log(result.roll.symbols); // ["CHERRY", "SEVEN", "BAR"]
+console.log(result.roll.won); // true`}
+                </SyntaxHighlighter>
+              </div>
             </div>
           )}
 

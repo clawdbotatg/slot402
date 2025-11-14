@@ -1,14 +1,26 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/**
+                            #         ###    #####  
+  ####  #       ####  ##### #    #   #   #  #     # 
+ #      #      #    #   #   #    #  #     #       # 
+  ####  #      #    #   #   #    #  #     #  #####  
+      # #      #    #   #   ####### #     # #       
+ #    # #      #    #   #        #   #   #  #       
+  ####  ######  ####    #        #    ###   ####### 
+                                                              
+           
+           */
+
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 /**
- * @title RugSlotToken
- * @notice Simple ERC20 token controlled by the RugSlot contract
- * @dev Only the owner (RugSlot contract) can mint new tokens
+ * @title Slot402Token
+ * @notice Simple ERC20 token controlled by the Slot402 contract
+ * @dev Only the owner (Slot402 contract) can mint new tokens
  */
-contract RugSlotToken is ERC20 {
+contract Slot402Token is ERC20 {
     address public owner;
     
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
@@ -18,8 +30,8 @@ contract RugSlotToken is ERC20 {
         _;
     }
     
-    constructor() ERC20("RugSlot", "RUGSLOT") {
-        owner = msg.sender; // Deployer is initial owner (will be RugSlot contract)
+    constructor() ERC20("Slot402", "S402") {
+        owner = msg.sender; // Deployer is initial owner (will be Slot402 contract)
     }
     
     /**

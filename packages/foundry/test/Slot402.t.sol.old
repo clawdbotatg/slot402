@@ -2,13 +2,13 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "../contracts/RugSlot.sol";
-import "../contracts/RugSlotToken.sol";
+import "../contracts/Slot402.sol";
+import "../contracts/Slot402Token.sol";
 import "../contracts/SimpleTokenSale.sol";
 
-contract RugSlotTest is Test {
-    RugSlot public slot;
-    RugSlotToken public token;
+contract Slot402Test is Test {
+    Slot402 public slot;
+    Slot402Token public token;
     
     address public owner;
     address public player1 = address(0x100);
@@ -20,10 +20,10 @@ contract RugSlotTest is Test {
     
     function setUp() public {
         // Deploy token first
-        token = new RugSlotToken();
+        token = new Slot402Token();
         
         // Deploy slot machine with token address
-        slot = new RugSlot(address(token));
+        slot = new Slot402(address(token));
         
         // Transfer token ownership to slot machine
         token.transferOwnership(address(slot));

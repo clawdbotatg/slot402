@@ -1,5 +1,5 @@
 /**
- * x402 Client for RugSlot
+ * x402 Client for Slot402
  *
  * CLI tool to test gasless slot machine rolls using x402 payments
  */
@@ -71,17 +71,17 @@ if (broadcast.transactions) {
 
 console.log(`📋 Deployed contracts:`, Object.keys(deployedContracts));
 
-// Get RugSlot contract address
-if (!deployedContracts.RugSlot) {
-  console.error(`❌ RugSlot contract not found in deployment`);
+// Get Slot402 contract address
+if (!deployedContracts.Slot402) {
+  console.error(`❌ Slot402 contract not found in deployment`);
   console.error(`   Available contracts:`, Object.keys(deployedContracts));
-  console.error(`   Deploy RugSlot first: yarn deploy`);
+  console.error(`   Deploy Slot402 first: yarn deploy`);
   process.exit(1);
 }
 
-const RUGSLOT_CONTRACT = deployedContracts.RugSlot.address;
+const RUGSLOT_CONTRACT = deployedContracts.Slot402.address;
 console.log(
-  `✅ Loaded RugSlot contract: ${RUGSLOT_CONTRACT} (chain ${CHAIN_ID})`
+  `✅ Loaded Slot402 contract: ${RUGSLOT_CONTRACT} (chain ${CHAIN_ID})`
 );
 
 console.log(`💼 Client Configuration:
@@ -89,7 +89,7 @@ console.log(`💼 Client Configuration:
   Network: Base (Chain ID: ${CHAIN_ID})
   Server: ${SERVER_URL}
   USDC: ${USDC_CONTRACT}
-  RugSlot: ${RUGSLOT_CONTRACT}
+  Slot402: ${RUGSLOT_CONTRACT}
 `);
 
 // ERC20 ABI for approve and balance checks
@@ -99,7 +99,7 @@ const ERC20_ABI = [
   "function balanceOf(address account) view returns (uint256)",
 ];
 
-// RugSlot ABI for commit operations
+// Slot402 ABI for commit operations
 const RUGSLOT_ABI = [
   "function getCommitHash(uint256 _secret) external pure returns (bytes32)",
   "function nonces(address) external view returns (uint256)",
@@ -219,7 +219,7 @@ async function executeRoll() {
       );
     }
 
-    // Step 2: Generate secret and get commit data from RugSlot contract
+    // Step 2: Generate secret and get commit data from Slot402 contract
     console.log("\n🎲 Step 2: Generating secret and commit data...");
     const rugSlotContract = new ethers.Contract(
       RUGSLOT_CONTRACT,
@@ -255,7 +255,7 @@ async function executeRoll() {
 
     // Sign the MetaCommit message
     const domain = {
-      name: "RugSlot",
+      name: "Slot402",
       version: "1",
       chainId: parseInt(CHAIN_ID),
       verifyingContract: RUGSLOT_CONTRACT,
@@ -295,13 +295,15 @@ async function executeRoll() {
     console.log(`   - extra.chainId: ${requirements.extra?.chainId}`);
     console.log(`   - extra.name: ${requirements.extra?.name}`);
     console.log(`   - extra.version: ${requirements.extra?.version}`);
-    
+
     const paymentPayload = await processPayment(requirements, wallet);
     console.log(`✅ Payment authorization signed`);
     console.log(
       `   Signature: ${paymentPayload.payload.signature.substring(0, 20)}...`
     );
-    console.log(`   Authorization nonce: ${paymentPayload.payload.authorization.nonce}`);
+    console.log(
+      `   Authorization nonce: ${paymentPayload.payload.authorization.nonce}`
+    );
 
     // Step 5: Submit everything to server
     console.log("\n📤 Step 5: Submitting to server and executing roll...");
@@ -340,14 +342,18 @@ async function executeRoll() {
     console.log("=".repeat(70));
     console.log("SLOT ROLL RESULT");
     console.log("=".repeat(70));
-    
+
     // Display symbols
     const symbols = result.roll.symbols || [];
     if (symbols.length === 3) {
-      console.log(`\n🎰 Result: [ ${symbols[0]} ] [ ${symbols[1]} ] [ ${symbols[2]} ]`);
+      console.log(
+        `\n🎰 Result: [ ${symbols[0]} ] [ ${symbols[1]} ] [ ${symbols[2]} ]`
+      );
     }
-    
-    console.log(`\n   Reel Positions: ${result.roll.reelPositions.reel1}, ${result.roll.reelPositions.reel2}, ${result.roll.reelPositions.reel3}`);
+
+    console.log(
+      `\n   Reel Positions: ${result.roll.reelPositions.reel1}, ${result.roll.reelPositions.reel2}, ${result.roll.reelPositions.reel3}`
+    );
 
     if (result.roll.won) {
       console.log(`\n🎉 🎉 🎉 WINNER! 🎉 🎉 🎉`);
@@ -356,11 +362,15 @@ async function executeRoll() {
       );
       console.log(`   Commit ID: ${result.roll.commitId}`);
       console.log(`   Secret: ${result.roll.secret.substring(0, 20)}...`);
-      
+
       if (result.roll.claimTransaction) {
-        console.log(`\n✅ Winnings automatically claimed and sent to your wallet!`);
+        console.log(
+          `\n✅ Winnings automatically claimed and sent to your wallet!`
+        );
         console.log(`   Claim TX: ${result.roll.claimTransaction}`);
-        console.log(`   View: https://basescan.org/tx/${result.roll.claimTransaction}`);
+        console.log(
+          `   View: https://basescan.org/tx/${result.roll.claimTransaction}`
+        );
       } else {
         console.log(
           `\n💡 Use revealAndCollect on the contract to claim your winnings!`
@@ -374,12 +384,12 @@ async function executeRoll() {
     console.log(
       `   View on BaseScan: https://basescan.org/tx/${result.payment.transaction}`
     );
-    
+
     // Check balance after roll
     const balanceAfter = await checkBalance();
     const balanceAfterUSDC = ethers.formatUnits(balanceAfter, 6);
     console.log(`\n💰 Your USDC Balance After Roll: ${balanceAfterUSDC} USDC`);
-    
+
     console.log("\n" + "=".repeat(70) + "\n");
   } catch (error) {
     console.error("\n❌ Error:", error.message);
@@ -392,7 +402,7 @@ async function executeRoll() {
  */
 async function main() {
   console.log("\n" + "=".repeat(70));
-  console.log("RugSlot x402 CLI Client");
+  console.log("Slot402 x402 CLI Client");
   console.log("=".repeat(70) + "\n");
 
   await executeRoll();

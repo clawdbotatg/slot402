@@ -12,7 +12,7 @@ Added two admin-only functions to `ManagedTreasury.sol` for testing swaps in pro
 ### Option 1: From the Debug Page (Easiest)
 
 1. Go to `http://localhost:3000/debug` (or your deployed frontend)
-2. Find the `RugSlot` contract section
+2. Find the `Slot402` contract section
 3. Look for `adminSwapETHForTokens` and `adminSwapTokensForETH`
 4. Call them as the contract owner
 
@@ -101,8 +101,8 @@ cast send 0x82ab042f2bf9fb6223a9f75fe76745e7fbebe3b4 \
 
 ## Current Contract Addresses (Base)
 
-- **RugSlot**: `0x82ab042f2bf9fb6223a9f75fe76745e7fbebe3b4`
-- **RugSlotToken**: `0x96155fb9f14a7ae1837da90002f04c1cabe5a90b`
+- **Slot402**: `0x82ab042f2bf9fb6223a9f75fe76745e7fbebe3b4`
+- **Slot402Token**: `0x96155fb9f14a7ae1837da90002f04c1cabe5a90b`
 - **Uniswap Pair**: `0x0d2E7Bab8CF64d1E49B2F5A3b853cB842A8839C6`
 
 ## Important Notes

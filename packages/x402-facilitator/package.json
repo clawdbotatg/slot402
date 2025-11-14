@@ -1,7 +1,7 @@
 {
   "name": "x402-facilitator",
   "version": "1.0.0",
-  "description": "x402 Payment Facilitator for RugSlot",
+  "description": "x402 Payment Facilitator for Slot402",
   "main": "facilitator.js",
   "scripts": {
     "start": "node facilitator.js"
