@@ -2,13 +2,15 @@
 pragma solidity ^0.8.20;
 
 import "./RugSlotToken.sol";
+import "./BaseConstants.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title SimpleTokenSale
  * @notice Abstract contract for simple token sale mechanics
  * @dev Provides phase management and token purchase functionality
  */
-abstract contract SimpleTokenSale {
+abstract contract SimpleTokenSale is BaseConstants {
     // ============ Enums ============
     
     enum Phase { OPEN, CLOSED }
@@ -49,18 +51,29 @@ abstract contract SimpleTokenSale {
     
     /**
      * @notice Buy tokens during the OPEN phase
-     * @dev Mints tokens based on ETH sent, transitions to CLOSED when max tokens sold
+     * @dev Mints tokens based on USDC sent, transitions to CLOSED when max tokens sold
+     * @param _tokenAmount Amount of tokens to buy (in 18 decimals)
      */
-    function buyTokens() external payable onlyPhase(Phase.OPEN) {
-        require(msg.value > 0, "Must send ETH");
-        require(msg.value % tokenPrice == 0, "Must send exact multiples of token price");
+    function buyTokens(uint256 _tokenAmount) external onlyPhase(Phase.OPEN) {
+        require(_tokenAmount > 0, "Must buy at least some tokens");
+        require(sellableToken.totalSupply() + _tokenAmount <= maxSaleTokens, "Exceeds max sale tokens");
         
-        uint256 tokenAmount = (msg.value * 1 ether) / tokenPrice;
-        require(sellableToken.totalSupply() + tokenAmount <= maxSaleTokens, "Exceeds max sale tokens");
+        // Calculate USDC amount needed
+        // tokenPrice is in USDC per token (6 decimals per token with 18 decimals)
+        // Example: if tokenPrice = 100 (0.0001 USDC per token with 6 decimals)
+        // and _tokenAmount = 1e18 (1 token), then usdcAmount = (1e18 * 100) / 1e18 = 100 USDC units
+        uint256 usdcAmount = (_tokenAmount * tokenPrice) / 1 ether;
+        require(usdcAmount > 0, "USDC amount must be positive");
         
-        sellableToken.mint(msg.sender, tokenAmount);
+        // Transfer USDC from buyer to contract
+        require(
+            IERC20(USDC).transferFrom(msg.sender, address(this), usdcAmount),
+            "USDC transfer failed"
+        );
         
-        emit TokensPurchased(msg.sender, tokenAmount, msg.value);
+        sellableToken.mint(msg.sender, _tokenAmount);
+        
+        emit TokensPurchased(msg.sender, _tokenAmount, usdcAmount);
         
         // Transition to CLOSED phase if all tokens sold
         if (sellableToken.totalSupply() == maxSaleTokens) {
@@ -78,4 +91,3 @@ abstract contract SimpleTokenSale {
      */
     function _onSaleComplete() internal virtual {}
 }
-

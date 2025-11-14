@@ -2,12 +2,10 @@
 
 import React from "react";
 import Link from "next/link";
-import { formatEther } from "viem";
 import { hardhat } from "viem/chains";
 import { FaucetButton, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import deployedContracts from "~~/contracts/deployedContracts";
-import { useScaffoldReadContract, useTargetNetwork, useWatchBalance } from "~~/hooks/scaffold-eth";
-import { useGlobalState } from "~~/services/store/store";
+import { useScaffoldReadContract, useTargetNetwork } from "~~/hooks/scaffold-eth";
 
 /**
  * Site header
@@ -15,7 +13,6 @@ import { useGlobalState } from "~~/services/store/store";
 export const Header = () => {
   const { targetNetwork } = useTargetNetwork();
   const isLocalNetwork = targetNetwork.id === hardhat.id;
-  const nativeCurrencyPrice = useGlobalState(state => state.nativeCurrency.price);
 
   const { data: currentPhase } = useScaffoldReadContract({
     contractName: "RugSlot",
@@ -28,9 +25,12 @@ export const Header = () => {
   const chainId = targetNetwork.id as keyof typeof deployedContracts;
   const contractAddress = (deployedContracts as any)[chainId]?.RugSlot?.address;
 
-  // Watch contract ETH balance
-  const { data: contractEthBalance } = useWatchBalance({
-    address: contractAddress as `0x${string}`,
+  // Watch contract USDC balance
+  const { data: contractUsdcBalance } = useScaffoldReadContract({
+    contractName: "USDC",
+    functionName: "balanceOf",
+    args: [contractAddress as `0x${string}`],
+    watch: true,
   });
 
   return (
@@ -47,18 +47,10 @@ export const Header = () => {
           </div>
         </Link>
         <div className="text-lg font-semibold">
-          {contractEthBalance ? (
-            <>
-              {Number(formatEther(contractEthBalance.value)).toFixed(6)} ETH
-              {nativeCurrencyPrice > 0 && (
-                <span className="opacity-70">
-                  {" "}
-                  (${(Number(formatEther(contractEthBalance.value)) * nativeCurrencyPrice).toFixed(2)})
-                </span>
-              )}
-            </>
+          {contractUsdcBalance !== undefined ? (
+            <>${(Number(contractUsdcBalance) / 1e6).toFixed(2)} USDC</>
           ) : (
-            <>0.000000 ETH</>
+            <>$0.00 USDC</>
           )}
         </div>
       </div>

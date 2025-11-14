@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { useGlobalState } from "~~/services/store/store";
 
 interface PayoutRow {
   symbol: string;
@@ -11,8 +10,7 @@ interface PayoutRow {
 }
 
 export const PayoutTable = () => {
-  const nativeCurrencyPrice = useGlobalState(state => state.nativeCurrency.price);
-  const BET_SIZE = 0.00005;
+  const BET_SIZE_USDC = 0.05; // 0.05 USDC
 
   const payouts: PayoutRow[] = [
     {
@@ -97,9 +95,8 @@ export const PayoutTable = () => {
           </thead>
           <tbody>
             {payouts.map((payout, index) => {
-              const payoutAmountEth = BET_SIZE * payout.multiplier;
-              const payoutAmountFormatted = payoutAmountEth.toFixed(6);
-              const payoutAmountUsd = nativeCurrencyPrice > 0 ? payoutAmountEth * nativeCurrencyPrice : 0;
+              const payoutAmountUsdc = BET_SIZE_USDC * payout.multiplier;
+              const payoutAmountFormatted = payoutAmountUsdc.toFixed(2);
               const isSpecial = payout.symbol === "BASEETH" || payout.symbol === "SEVEN";
               const rowColor = index % 2 === 0 ? "#3a6b78" : "#2d5a66";
 
@@ -158,10 +155,7 @@ export const PayoutTable = () => {
                   </td>
                   <td className="p-3 text-right border-2 border-black">
                     <div className="flex flex-col items-end">
-                      <span className="text-green-300 font-bold text-lg">{payoutAmountFormatted} ETH</span>
-                      {nativeCurrencyPrice > 0 && (
-                        <span className="text-gray-300 text-sm">(${payoutAmountUsd.toFixed(2)} USD)</span>
-                      )}
+                      <span className="text-green-300 font-bold text-lg">${payoutAmountFormatted} USDC</span>
                     </div>
                   </td>
                 </tr>
@@ -172,12 +166,7 @@ export const PayoutTable = () => {
       </div>
 
       <div className="mt-4 text-center text-sm text-gray-300">
-        <p>
-          Bet Size: {BET_SIZE} ETH per spin
-          {nativeCurrencyPrice > 0 && (
-            <span className="ml-2">(${(BET_SIZE * nativeCurrencyPrice).toFixed(4)} USD)</span>
-          )}
-        </p>
+        <p>Bet Size: ${BET_SIZE_USDC} USDC per spin</p>
         <p className="mt-1">
           <span className="text-yellow-300">⚡</span> Any Bar Combo = Any mix of BAR and DOUBLE BAR{" "}
           <span className="text-yellow-300">⚡</span>

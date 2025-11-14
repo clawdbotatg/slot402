@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   8453: {
     RugSlotToken: {
-      address: "0xc7af97fe7f9ec214ee4fb676ad85ed6cd11fbfc5",
+      address: "0x24d7cde845aa16632392f302f3cc2b2691e19cfb",
       abi: [
         {
           type: "constructor",
@@ -387,10 +387,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 37401600,
+      deployedOnBlock: 38148356,
     },
     RugSlot: {
-      address: "0xd5582f8917460a2808816c46c44d55c7ea39e113",
+      address: "0xa0b82188f634b676588a197fae40e2e5c0a46921",
       abi: [
         {
           type: "constructor",
@@ -402,10 +402,6 @@ const deployedContracts = {
             },
           ],
           stateMutability: "nonpayable",
-        },
-        {
-          type: "receive",
-          stateMutability: "payable",
         },
         {
           type: "function",
@@ -435,7 +431,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "LIQUIDITY_ETH_AMOUNT",
+          name: "LIQUIDITY_TOKEN_AMOUNT",
           inputs: [],
           outputs: [
             {
@@ -448,7 +444,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "LIQUIDITY_TOKEN_AMOUNT",
+          name: "LIQUIDITY_USDC_AMOUNT",
           inputs: [],
           outputs: [
             {
@@ -643,7 +639,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "WETH",
+          name: "USDC",
           inputs: [],
           outputs: [
             {
@@ -663,20 +659,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "adminSwapETHForTokens",
-          inputs: [],
-          outputs: [
-            {
-              name: "amountOut",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "payable",
-        },
-        {
-          type: "function",
-          name: "adminSwapTokensForETH",
+          name: "adminSwapTokensForUSDC",
           inputs: [
             {
               name: "_tokenAmount",
@@ -695,10 +678,35 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "adminSwapUSDCForTokens",
+          inputs: [
+            {
+              name: "_usdcAmount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "amountOut",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "buyTokens",
-          inputs: [],
+          inputs: [
+            {
+              name: "_tokenAmount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
           outputs: [],
-          stateMutability: "payable",
+          stateMutability: "nonpayable",
         },
         {
           type: "function",
@@ -756,7 +764,7 @@ const deployedContracts = {
               internalType: "uint256",
             },
           ],
-          stateMutability: "payable",
+          stateMutability: "nonpayable",
         },
         {
           type: "function",
@@ -1095,8 +1103,14 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "rescueWETH",
-          inputs: [],
+          name: "rescueTokens",
+          inputs: [
+            {
+              name: "_tokenAddress",
+              type: "address",
+              internalType: "address",
+            },
+          ],
           outputs: [],
           stateMutability: "nonpayable",
         },
@@ -1270,7 +1284,7 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
-              name: "ethAmount",
+              name: "usdcAmount",
               type: "uint256",
               indexed: false,
               internalType: "uint256",
@@ -1289,7 +1303,7 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
-              name: "ethAmount",
+              name: "usdcAmount",
               type: "uint256",
               indexed: false,
               internalType: "uint256",
@@ -1321,7 +1335,7 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
-              name: "ethUsed",
+              name: "usdcUsed",
               type: "uint256",
               indexed: false,
               internalType: "uint256",
@@ -1394,12 +1408,12 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 37401600,
+      deployedOnBlock: 38148356,
     },
   },
   31337: {
     RugSlotToken: {
-      address: "0x75f2bbef013b76d2fdacc88a6c3a8591682b9111",
+      address: "0x400c00bf16c25f0db891311f1785520ce651c116",
       abi: [
         {
           type: "constructor",
@@ -1779,10 +1793,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 37400719,
+      deployedOnBlock: 38147180,
     },
     RugSlot: {
-      address: "0x9ee9c2ab25be4d991759f6d2fa23c2b7871ee708",
+      address: "0xf82586fcb7918c94077fdd4e8a52cb1eed300e17",
       abi: [
         {
           type: "constructor",
@@ -1794,10 +1808,6 @@ const deployedContracts = {
             },
           ],
           stateMutability: "nonpayable",
-        },
-        {
-          type: "receive",
-          stateMutability: "payable",
         },
         {
           type: "function",
@@ -1827,7 +1837,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "LIQUIDITY_ETH_AMOUNT",
+          name: "LIQUIDITY_TOKEN_AMOUNT",
           inputs: [],
           outputs: [
             {
@@ -1840,7 +1850,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "LIQUIDITY_TOKEN_AMOUNT",
+          name: "LIQUIDITY_USDC_AMOUNT",
           inputs: [],
           outputs: [
             {
@@ -2035,7 +2045,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "WETH",
+          name: "USDC",
           inputs: [],
           outputs: [
             {
@@ -2055,20 +2065,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "adminSwapETHForTokens",
-          inputs: [],
-          outputs: [
-            {
-              name: "amountOut",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "payable",
-        },
-        {
-          type: "function",
-          name: "adminSwapTokensForETH",
+          name: "adminSwapTokensForUSDC",
           inputs: [
             {
               name: "_tokenAmount",
@@ -2087,10 +2084,35 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "adminSwapUSDCForTokens",
+          inputs: [
+            {
+              name: "_usdcAmount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "amountOut",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "buyTokens",
-          inputs: [],
+          inputs: [
+            {
+              name: "_tokenAmount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
           outputs: [],
-          stateMutability: "payable",
+          stateMutability: "nonpayable",
         },
         {
           type: "function",
@@ -2148,7 +2170,7 @@ const deployedContracts = {
               internalType: "uint256",
             },
           ],
-          stateMutability: "payable",
+          stateMutability: "nonpayable",
         },
         {
           type: "function",
@@ -2487,8 +2509,14 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "rescueWETH",
-          inputs: [],
+          name: "rescueTokens",
+          inputs: [
+            {
+              name: "_tokenAddress",
+              type: "address",
+              internalType: "address",
+            },
+          ],
           outputs: [],
           stateMutability: "nonpayable",
         },
@@ -2662,7 +2690,7 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
-              name: "ethAmount",
+              name: "usdcAmount",
               type: "uint256",
               indexed: false,
               internalType: "uint256",
@@ -2681,7 +2709,7 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
-              name: "ethAmount",
+              name: "usdcAmount",
               type: "uint256",
               indexed: false,
               internalType: "uint256",
@@ -2713,7 +2741,7 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
-              name: "ethUsed",
+              name: "usdcUsed",
               type: "uint256",
               indexed: false,
               internalType: "uint256",
@@ -2786,7 +2814,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 37400720,
+      deployedOnBlock: 38147181,
     },
   },
   42161: {
@@ -2805,10 +2833,6 @@ const deployedContracts = {
           stateMutability: "nonpayable",
         },
         {
-          type: "receive",
-          stateMutability: "payable",
-        },
-        {
           type: "function",
           name: "BET_SIZE",
           inputs: [],
@@ -2836,7 +2860,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "LIQUIDITY_ETH_AMOUNT",
+          name: "LIQUIDITY_TOKEN_AMOUNT",
           inputs: [],
           outputs: [
             {
@@ -2849,7 +2873,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "LIQUIDITY_TOKEN_AMOUNT",
+          name: "LIQUIDITY_USDC_AMOUNT",
           inputs: [],
           outputs: [
             {
@@ -3044,7 +3068,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "WETH",
+          name: "USDC",
           inputs: [],
           outputs: [
             {
@@ -3064,20 +3088,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "adminSwapETHForTokens",
-          inputs: [],
-          outputs: [
-            {
-              name: "amountOut",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "payable",
-        },
-        {
-          type: "function",
-          name: "adminSwapTokensForETH",
+          name: "adminSwapTokensForUSDC",
           inputs: [
             {
               name: "_tokenAmount",
@@ -3096,10 +3107,35 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "adminSwapUSDCForTokens",
+          inputs: [
+            {
+              name: "_usdcAmount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "amountOut",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "buyTokens",
-          inputs: [],
+          inputs: [
+            {
+              name: "_tokenAmount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
           outputs: [],
-          stateMutability: "payable",
+          stateMutability: "nonpayable",
         },
         {
           type: "function",
@@ -3157,7 +3193,7 @@ const deployedContracts = {
               internalType: "uint256",
             },
           ],
-          stateMutability: "payable",
+          stateMutability: "nonpayable",
         },
         {
           type: "function",
@@ -3496,8 +3532,14 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "rescueWETH",
-          inputs: [],
+          name: "rescueTokens",
+          inputs: [
+            {
+              name: "_tokenAddress",
+              type: "address",
+              internalType: "address",
+            },
+          ],
           outputs: [],
           stateMutability: "nonpayable",
         },
@@ -3671,7 +3713,7 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
-              name: "ethAmount",
+              name: "usdcAmount",
               type: "uint256",
               indexed: false,
               internalType: "uint256",
@@ -3690,7 +3732,7 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
-              name: "ethAmount",
+              name: "usdcAmount",
               type: "uint256",
               indexed: false,
               internalType: "uint256",
@@ -3722,7 +3764,7 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
-              name: "ethUsed",
+              name: "usdcUsed",
               type: "uint256",
               indexed: false,
               internalType: "uint256",

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { parseEther } from "viem";
-import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { Address } from "~~/components/scaffold-eth";
+import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
 interface OwnerControlsProps {
   connectedAddress: string | undefined;
@@ -11,10 +12,21 @@ export function OwnerControls({ connectedAddress }: OwnerControlsProps) {
   const { writeContractAsync: writeRemoveLiquidity } = useScaffoldWriteContract("RugSlot");
   const { writeContractAsync: writeRug } = useScaffoldWriteContract("RugSlot");
   const { writeContractAsync: writeRugMint } = useScaffoldWriteContract("RugSlot");
-  const { writeContractAsync: writeAdminSwapETHForTokens } = useScaffoldWriteContract("RugSlot");
-  const { writeContractAsync: writeAdminSwapTokensForETH } = useScaffoldWriteContract("RugSlot");
+  const { writeContractAsync: writeAdminSwapUSDCForTokens } = useScaffoldWriteContract("RugSlot");
+  const { writeContractAsync: writeAdminSwapTokensForUSDC } = useScaffoldWriteContract("RugSlot");
 
-  const [swapEthAmount, setSwapEthAmount] = useState("0.00005");
+  // Read liquidity status from contract
+  const { data: liquidityAdded } = useScaffoldReadContract({
+    contractName: "RugSlot",
+    functionName: "liquidityAdded",
+  });
+
+  const { data: uniswapPair } = useScaffoldReadContract({
+    contractName: "RugSlot",
+    functionName: "uniswapPair",
+  });
+
+  const [swapUsdcAmount, setSwapUsdcAmount] = useState("50");
   const [swapTokenAmount, setSwapTokenAmount] = useState("0.1");
 
   const handleAddLiquidity = async () => {
@@ -65,29 +77,31 @@ export function OwnerControls({ connectedAddress }: OwnerControlsProps) {
     }
   };
 
-  const handleAdminSwapETHForTokens = async () => {
+  const handleAdminSwapUSDCForTokens = async () => {
     try {
-      console.log(`Swapping ${swapEthAmount} ETH for tokens...`);
-      await writeAdminSwapETHForTokens({
-        functionName: "adminSwapETHForTokens",
-        value: parseEther(swapEthAmount),
+      // USDC has 6 decimals, so we need to convert the amount
+      const usdcAmount = BigInt(Math.floor(parseFloat(swapUsdcAmount) * 1e6));
+      console.log(`Swapping ${swapUsdcAmount} USDC for tokens...`);
+      await writeAdminSwapUSDCForTokens({
+        functionName: "adminSwapUSDCForTokens",
+        args: [usdcAmount],
       });
       console.log("Swap successful! Check transaction for token amount received 🎉");
     } catch (e) {
-      console.error("Error swapping ETH for tokens:", e);
+      console.error("Error swapping USDC for tokens:", e);
     }
   };
 
-  const handleAdminSwapTokensForETH = async () => {
+  const handleAdminSwapTokensForUSDC = async () => {
     try {
-      console.log(`Swapping ${swapTokenAmount} tokens for ETH...`);
-      await writeAdminSwapTokensForETH({
-        functionName: "adminSwapTokensForETH",
+      console.log(`Swapping ${swapTokenAmount} tokens for USDC...`);
+      await writeAdminSwapTokensForUSDC({
+        functionName: "adminSwapTokensForUSDC",
         args: [parseEther(swapTokenAmount)],
       });
-      console.log("Swap successful! Check transaction for ETH amount received 🎉");
+      console.log("Swap successful! Check transaction for USDC amount received 🎉");
     } catch (e) {
-      console.error("Error swapping tokens for ETH:", e);
+      console.error("Error swapping tokens for USDC:", e);
     }
   };
 
@@ -101,12 +115,30 @@ export function OwnerControls({ connectedAddress }: OwnerControlsProps) {
       <h2 className="text-2xl font-semibold mb-4">👑 Owner Controls</h2>
       <p className="mb-4">You are the owner!</p>
 
+      {/* Liquidity Status */}
+      <div className="mb-4 p-3 bg-base-100 rounded-lg">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="font-semibold">Liquidity Status:</span>
+          {liquidityAdded ? (
+            <span className="badge badge-success">✅ Added</span>
+          ) : (
+            <span className="badge badge-error">❌ Not Added (Buyback Disabled!)</span>
+          )}
+        </div>
+        {uniswapPair && uniswapPair !== "0x0000000000000000000000000000000000000000" && (
+          <div className="text-sm">
+            <span className="opacity-70">Uniswap Pair: </span>
+            <Address address={uniswapPair} />
+          </div>
+        )}
+      </div>
+
       {/* Liquidity Controls */}
       <div className="mb-6">
         <h3 className="text-lg font-semibold mb-2">Liquidity</h3>
         <div className="flex gap-2 flex-wrap">
           <button className="btn btn-error" onClick={handleAddLiquidity}>
-            Add Liquidity (0.0015 ETH + 15 tokens)
+            Add Liquidity (0.15 USDC + 150 tokens)
           </button>
           <button className="btn btn-error" onClick={handleRemoveLiquidity}>
             Remove Liquidity
@@ -118,26 +150,26 @@ export function OwnerControls({ connectedAddress }: OwnerControlsProps) {
       <div className="mb-6">
         <h3 className="text-lg font-semibold mb-2">Test Swaps (Debug)</h3>
         <div className="flex gap-4 flex-wrap items-end">
-          {/* Swap ETH for Tokens */}
+          {/* Swap USDC for Tokens */}
           <div className="form-control">
             <label className="label">
-              <span className="label-text">ETH Amount</span>
+              <span className="label-text">USDC Amount (6 decimals)</span>
             </label>
             <div className="flex gap-2">
               <input
                 type="text"
-                placeholder="0.00005"
+                placeholder="50"
                 className="input input-bordered w-32"
-                value={swapEthAmount}
-                onChange={e => setSwapEthAmount(e.target.value)}
+                value={swapUsdcAmount}
+                onChange={e => setSwapUsdcAmount(e.target.value)}
               />
-              <button className="btn btn-primary" onClick={handleAdminSwapETHForTokens}>
-                Swap ETH → Tokens
+              <button className="btn btn-primary" onClick={handleAdminSwapUSDCForTokens}>
+                Swap USDC → Tokens
               </button>
             </div>
           </div>
 
-          {/* Swap Tokens for ETH */}
+          {/* Swap Tokens for USDC */}
           <div className="form-control">
             <label className="label">
               <span className="label-text">Token Amount</span>
@@ -150,8 +182,8 @@ export function OwnerControls({ connectedAddress }: OwnerControlsProps) {
                 value={swapTokenAmount}
                 onChange={e => setSwapTokenAmount(e.target.value)}
               />
-              <button className="btn btn-primary" onClick={handleAdminSwapTokensForETH}>
-                Swap Tokens → ETH
+              <button className="btn btn-primary" onClick={handleAdminSwapTokensForUSDC}>
+                Swap Tokens → USDC
               </button>
             </div>
           </div>
@@ -163,7 +195,7 @@ export function OwnerControls({ connectedAddress }: OwnerControlsProps) {
         <h3 className="text-lg font-semibold mb-2">Rug Functions</h3>
         <div className="flex gap-2 flex-wrap">
           <button className="btn btn-error" onClick={handleRug}>
-            Rug (Withdraw All ETH)
+            Rug (Withdraw All USDC)
           </button>
           <button className="btn btn-error" onClick={handleRugMint}>
             RugMint (Mint 1 Token to Owner)

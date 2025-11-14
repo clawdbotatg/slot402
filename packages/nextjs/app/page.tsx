@@ -10,7 +10,6 @@ import { SlotMachine } from "./components/SlotMachine";
 import { TokenSalePhase } from "./components/TokenSalePhase";
 import { TokenSection } from "./components/TokenSection";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
-import { parseEther } from "viem";
 import { useAccount, useBlockNumber } from "wagmi";
 import { usePublicClient } from "wagmi";
 import deployedContracts from "~~/contracts/deployedContracts";
@@ -41,6 +40,9 @@ export default function Home() {
     reel2: number;
     reel3: number;
   } | null>(null);
+  const [showSwapModal, setShowSwapModal] = useState(false);
+  const [swapAmount, setSwapAmount] = useState("0.001"); // ETH amount to swap
+  const [isSwapping, setIsSwapping] = useState(false);
 
   // Map Symbol enum to image paths
   const symbolToImage = (symbolIndex: number): string => {
@@ -231,6 +233,23 @@ export default function Home() {
   // Write functions
   const { writeContractAsync: writeCommit } = useScaffoldWriteContract("RugSlot");
   const { writeContractAsync: writeRevealAndCollect } = useScaffoldWriteContract("RugSlot");
+  const { writeContractAsync: writeUSDCApprove } = useScaffoldWriteContract("USDC");
+  const { writeContractAsync: writeSwap } = useScaffoldWriteContract("UniswapV2Router");
+
+  // Read USDC allowance and balance
+  const { data: usdcAllowance } = useScaffoldReadContract({
+    contractName: "USDC",
+    functionName: "allowance",
+    args: [connectedAddress as `0x${string}`, rugSlotAddress as `0x${string}`],
+    watch: true,
+  });
+
+  const { data: usdcBalance } = useScaffoldReadContract({
+    contractName: "USDC",
+    functionName: "balanceOf",
+    args: [connectedAddress as `0x${string}`],
+    watch: true,
+  });
 
   const handleRollButtonClick = () => {
     if (!connectedAddress) {
@@ -251,22 +270,42 @@ export default function Home() {
     setIsCommitting(true);
     setRollError(null);
 
-    const currentCommitId = commitCount;
-    const randomSecret = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString();
+    const BET_SIZE = 50000n; // 0.05 USDC (6 decimals)
 
-    setSecret(randomSecret);
-    setCommitId(currentCommitId);
-    setIsWinner(null);
-    setRollResult(null);
-    setReelPositions(null); // Clear previous reel positions for this new spin
+    // Check USDC balance
+    if (usdcBalance !== undefined && usdcBalance < BET_SIZE) {
+      setRollError("Insufficient USDC balance (need 0.05 USDC)");
+      setIsCommitting(false);
+      return;
+    }
 
-    saveCommit(currentCommitId, randomSecret);
-
-    console.log("Generated secret:", randomSecret);
-    console.log(`This will be commit ID: ${currentCommitId} for address: ${connectedAddress}`);
-
-    // Send transaction and wait for user to sign
     try {
+      // Check if we need to approve USDC
+      if (usdcAllowance === undefined || usdcAllowance < BET_SIZE) {
+        console.log("💰 Need to approve USDC spending...");
+        const approveTxHash = await writeUSDCApprove({
+          functionName: "approve",
+          args: [rugSlotAddress as `0x${string}`, BET_SIZE * 1000n], // Approve for multiple rolls
+        });
+        console.log("✅ USDC approved! Hash:", approveTxHash);
+        // Wait a moment for approval to be confirmed
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+
+      const currentCommitId = commitCount;
+      const randomSecret = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString();
+
+      setSecret(randomSecret);
+      setCommitId(currentCommitId);
+      setIsWinner(null);
+      setRollResult(null);
+      setReelPositions(null); // Clear previous reel positions for this new spin
+
+      saveCommit(currentCommitId, randomSecret);
+
+      console.log("Generated secret:", randomSecret);
+      console.log(`This will be commit ID: ${currentCommitId} for address: ${connectedAddress}`);
+
       const chainId = targetNetwork.id as keyof typeof deployedContracts;
       const contractAddress = (deployedContracts as any)[chainId]?.RugSlot?.address;
       const contractABI = (deployedContracts as any)[chainId]?.RugSlot?.abi;
@@ -290,7 +329,6 @@ export default function Home() {
       const txHash = await writeCommit({
         functionName: "commit",
         args: [commitHash as `0x${string}`],
-        value: parseEther("0.00005"),
       });
 
       // Only reach here if transaction was successfully signed
@@ -425,6 +463,50 @@ export default function Home() {
     console.log("ℹ️  Pending reveals preserved:", pendingReveals.length);
   };
 
+  const handleSwap = async () => {
+    if (!connectedAddress) return;
+
+    setIsSwapping(true);
+    try {
+      const WETH = "0x4200000000000000000000000000000000000006"; // Base WETH
+      const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // Base USDC
+
+      // Calculate ETH amount in wei
+      const ethAmountWei = BigInt(Math.floor(parseFloat(swapAmount) * 1e18));
+
+      // Path: WETH -> USDC
+      const path = [WETH, USDC];
+
+      // Calculate minimum USDC out (with 0.5% slippage tolerance)
+      // For 0.001 ETH at ~$2500 ETH price = ~$2.50 = 2,500,000 USDC units (6 decimals)
+      // But we'll use getAmountsOut to get the actual amount
+      const minAmountOut = 1n; // We'll accept any amount for simplicity
+
+      // Set deadline to 5 minutes from now
+      const deadline = Math.floor(Date.now() / 1000) + 300;
+
+      console.log("💱 Swapping", swapAmount, "ETH for USDC...");
+      console.log("Path:", path);
+
+      const txHash = await writeSwap({
+        functionName: "swapExactETHForTokens",
+        args: [minAmountOut, path, connectedAddress as `0x${string}`, BigInt(deadline)],
+        value: ethAmountWei,
+      });
+
+      console.log("✅ Swap successful! Hash:", txHash);
+      setShowSwapModal(false);
+
+      // Wait for balances to update
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    } catch (e) {
+      console.error("Error swapping:", e);
+      alert("Swap failed. Please try again.");
+    } finally {
+      setIsSwapping(false);
+    }
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-8" style={{ backgroundColor: "#1c3d45" }}>
       <div className="max-w-4xl w-full">
@@ -512,8 +594,27 @@ export default function Home() {
                 {/* Roll Button */}
                 <div
                   className="flex flex-col items-center gap-4"
-                  style={{ position: "absolute", top: "610px", left: "750px" }}
+                  style={{ position: "absolute", top: "532px", left: "750px" }}
                 >
+                  {/* User Balance Display */}
+                  {connectedAddress && usdcBalance !== undefined && (
+                    <div
+                      style={{
+                        padding: "8px 16px",
+                        backgroundColor: "#2d5a66",
+                        border: "3px solid black",
+                        borderRadius: "4px",
+                        boxShadow: "4px 4px 0 0 rgba(0, 0, 0, 0.8)",
+                        marginLeft: "35px",
+                      }}
+                    >
+                      <div style={{ fontSize: "12px", opacity: 0.8, textAlign: "center" }}>Your Balance</div>
+                      <div style={{ fontSize: "18px", fontWeight: "bold", textAlign: "center", color: "#fff" }}>
+                        ${(Number(usdcBalance) / 1e6).toFixed(2)} USDC
+                      </div>
+                    </div>
+                  )}
+
                   {rollError && (
                     <div className="alert alert-error w-full max-w-md">
                       <svg
@@ -587,8 +688,23 @@ export default function Home() {
                       ? "Connect Wallet"
                       : isCommitting || isPolling || reelsAnimating
                         ? "Rolling..."
-                        : "Roll (0.00005 ETH)"}
+                        : "Roll ($0.05 USDC)"}
                   </button>
+
+                  {/* Swap button when insufficient USDC */}
+                  {connectedAddress && usdcBalance !== undefined && usdcBalance < 50000n && (
+                    <button
+                      className="btn btn-warning btn-sm mt-2"
+                      style={{
+                        width: "180px",
+                        fontSize: "12px",
+                        border: "2px solid black",
+                      }}
+                      onClick={() => setShowSwapModal(true)}
+                    >
+                      💱 Swap ETH for USDC
+                    </button>
+                  )}
                 </div>
 
                 {/* Pending Reveals - positioned over the slot machine */}
@@ -656,6 +772,58 @@ export default function Home() {
             </Link>
           </div>
         </div>
+
+        {/* Swap Modal */}
+        {showSwapModal && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            onClick={() => setShowSwapModal(false)}
+          >
+            <div
+              className="bg-base-200 rounded-lg p-6 max-w-md w-full m-4"
+              onClick={e => e.stopPropagation()}
+              style={{ border: "4px solid black" }}
+            >
+              <h2 className="text-2xl font-bold mb-4">💱 Swap ETH for USDC</h2>
+              <p className="text-sm opacity-70 mb-4">
+                You need at least $0.05 USDC to roll. Swap some ETH for USDC using Uniswap.
+              </p>
+
+              <div className="mb-4">
+                <label className="block text-sm font-semibold mb-2">ETH Amount</label>
+                <input
+                  type="number"
+                  step="0.0001"
+                  min="0.0001"
+                  value={swapAmount}
+                  onChange={e => setSwapAmount(e.target.value)}
+                  className="input input-bordered w-full"
+                  placeholder="0.001"
+                />
+                <p className="text-xs opacity-60 mt-1">Suggested: 0.001 ETH ≈ $2.50 USDC (enough for ~50 rolls)</p>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  className="btn btn-primary flex-grow"
+                  onClick={handleSwap}
+                  disabled={isSwapping || !swapAmount || parseFloat(swapAmount) <= 0}
+                >
+                  {isSwapping ? "Swapping..." : `Swap ${swapAmount} ETH`}
+                </button>
+                <button className="btn btn-ghost" onClick={() => setShowSwapModal(false)} disabled={isSwapping}>
+                  Cancel
+                </button>
+              </div>
+
+              <div className="mt-4 text-xs opacity-60">
+                <p>• Using Uniswap V2 on Base</p>
+                <p>• 0.3% swap fee applies</p>
+                <p>• Transaction will require gas</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

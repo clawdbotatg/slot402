@@ -53,7 +53,7 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     
     // ============ Constants ============
     
-    uint256 public constant BET_SIZE = 0.00005 ether;
+    uint256 public constant BET_SIZE = 50000; // 0.05 USDC (6 decimals)
     uint256 public constant MAX_BLOCKS_FOR_REVEAL = 256;
     
     // Payout multipliers for each symbol type
@@ -106,7 +106,7 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     // ============ Constructor ============
     
     constructor(address _tokenAddress) 
-        SimpleTokenSale(_tokenAddress, 0.0001 ether, 150 * 10**18) // TESTING: 1/10 of normal (was 1500)
+        SimpleTokenSale(_tokenAddress, 1000, 1500 * 10**18) // 1000 USDC units = 0.001 USDC per token (6 decimals); Total sale = $1.50
         ManagedTreasury(_tokenAddress) 
     {
         _owner = 0x05937Df8ca0636505d92Fd769d303A3D461587ed;
@@ -161,9 +161,14 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
      * @param _commitHash keccak256(abi.encodePacked(secret))
      * @return commitId The ID of this commit for later reveal
      */
-    function commit(bytes32 _commitHash) external payable onlyPhase(Phase.CLOSED) returns (uint256) {
-        require(msg.value == BET_SIZE, "Must bet exactly 0.00005 ETH");
+    function commit(bytes32 _commitHash) external onlyPhase(Phase.CLOSED) returns (uint256) {
         require(_commitHash != bytes32(0), "Invalid commit hash");
+        
+        // Transfer USDC from user to contract
+        require(
+            IERC20(USDC).transferFrom(msg.sender, address(this), BET_SIZE),
+            "USDC transfer failed"
+        );
         
         uint256 commitId = commitCount[msg.sender];
         commitCount[msg.sender]++;
@@ -176,15 +181,15 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
             revealed: false
         });
         
-        emit CommitPlaced(msg.sender, commitId, msg.value);
+        emit CommitPlaced(msg.sender, commitId, BET_SIZE);
         
         // Check if we should buyback and burn
         // Only use excess that was there BEFORE this bet came in
-        uint256 balanceBeforeBet = address(this).balance - msg.value;
+        uint256 balanceBeforeBet = IERC20(USDC).balanceOf(address(this)) - BET_SIZE;
         if (balanceBeforeBet > TREASURY_THRESHOLD) {
             uint256 excess = balanceBeforeBet - TREASURY_THRESHOLD;
-            if (excess > 0.00005 ether && uniswapPair != address(0)) {
-                uint256 tokensBought = _swapETHForTokens(excess);
+            if (excess > 50 && uniswapPair != address(0)) {
+                uint256 tokensBought = _swapUSDCForTokens(excess);
                 if (tokensBought > 0) {
                     // Transfer tokens from this contract to burn address
                     require(token.transfer(BURN_ADDRESS, tokensBought), "Burn transfer failed");
@@ -302,30 +307,30 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
         require(userCommit.amountPaid < userCommit.amountWon, "Already fully paid");
         
         uint256 amountOwed = userCommit.amountWon - userCommit.amountPaid;
-        uint256 balance = address(this).balance;
+        uint256 balance = IERC20(USDC).balanceOf(address(this));
         
         // Simple logic: Do we have enough to pay them?
         if (balance >= amountOwed) {
             // Yes! Pay in full
             userCommit.amountPaid = userCommit.amountWon;
-            payable(msg.sender).transfer(amountOwed);
+            require(IERC20(USDC).transfer(msg.sender, amountOwed), "USDC transfer failed");
             emit WinningsCollected(msg.sender, _commitId, amountOwed);
         } else {
-            // Not enough ETH - need to mint and sell tokens first
-            _mintAndSellForETH(amountOwed);
+            // Not enough USDC - need to mint and sell tokens first
+            _mintAndSellForUSDC(amountOwed);
             
             // Check balance after minting
-            uint256 newBalance = address(this).balance;
+            uint256 newBalance = IERC20(USDC).balanceOf(address(this));
             
             if (newBalance >= amountOwed) {
                 // Now we can pay in full!
                 userCommit.amountPaid = userCommit.amountWon;
-                payable(msg.sender).transfer(amountOwed);
+                require(IERC20(USDC).transfer(msg.sender, amountOwed), "USDC transfer failed");
                 emit WinningsCollected(msg.sender, _commitId, amountOwed);
             } else if (newBalance > 0) {
                 // Partial payment - pay what we can
                 userCommit.amountPaid += newBalance;
-                payable(msg.sender).transfer(newBalance);
+                require(IERC20(USDC).transfer(msg.sender, newBalance), "USDC transfer failed");
                 emit WinningsCollected(msg.sender, _commitId, newBalance);
                 // User needs to call collect again to get the rest
             } else {
@@ -510,20 +515,23 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     
     /**
      * @notice Emergency rug function for testing (REMOVE BEFORE PRODUCTION)
-     * @dev Allows owner to withdraw all ETH
+     * @dev Allows owner to withdraw all USDC
      */
     function rug() external onlyOwner {
-        payable(_owner).transfer(address(this).balance);
+        uint256 usdcBalance = IERC20(USDC).balanceOf(address(this));
+        require(IERC20(USDC).transfer(_owner, usdcBalance), "USDC transfer failed");
     }
     
     /**
-     * @notice Rescue stuck WETH by unwrapping to ETH
-     * @dev Useful if swaps fail and WETH accumulates in the contract
+     * @notice Rescue stuck ERC20 tokens
+     * @dev Useful if tokens accumulate in the contract
+     * @param _tokenAddress Address of the ERC20 token to rescue
      */
-    function rescueWETH() external onlyOwner {
-        uint256 wethBalance = IWETH(WETH).balanceOf(address(this));
-        if (wethBalance > 0) {
-            IWETH(WETH).withdraw(wethBalance);
+    function rescueTokens(address _tokenAddress) external onlyOwner {
+        require(_tokenAddress != address(token), "Cannot rescue RugSlotToken");
+        uint256 tokenBalance = IERC20(_tokenAddress).balanceOf(address(this));
+        if (tokenBalance > 0) {
+            require(IERC20(_tokenAddress).transfer(_owner, tokenBalance), "Token transfer failed");
         }
     }
     
@@ -542,8 +550,4 @@ contract RugSlot is SimpleTokenSale, ManagedTreasury {
     function renounceOwnership() external onlyOwner {
         _owner = address(0);
     }
-    
-    // ============ Receive Function ============
-    
-    receive() external payable {}
 }

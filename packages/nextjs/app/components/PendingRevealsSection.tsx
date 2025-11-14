@@ -1,4 +1,3 @@
-import { formatEther } from "viem";
 import { PendingReveal } from "~~/hooks/usePendingReveals";
 
 interface PendingRevealsSectionProps {
@@ -7,6 +6,12 @@ interface PendingRevealsSectionProps {
   onCollect: (commitId: string, secret: string) => void;
   onRemove: (commitId: string) => void;
 }
+
+// Format USDC amount (6 decimals)
+const formatUSDC = (amount: bigint): string => {
+  const usdcAmount = Number(amount) / 1e6;
+  return usdcAmount.toFixed(2);
+};
 
 export function PendingRevealsSection({
   pendingReveals,
@@ -58,11 +63,9 @@ export function PendingRevealsSection({
               <div className="flex justify-between items-center">
                 <div>
                   <p className="font-semibold">Commit #{reveal.commitId}</p>
-                  <p className="text-sm opacity-90">Remaining: {Number(formatEther(amountRemaining)).toFixed(5)} ETH</p>
+                  <p className="text-sm opacity-90">Remaining: ${formatUSDC(amountRemaining)} USDC</p>
                   {reveal.amountPaid > 0n && (
-                    <p className="text-xs opacity-75">
-                      Already paid: {Number(formatEther(reveal.amountPaid)).toFixed(5)} ETH
-                    </p>
+                    <p className="text-xs opacity-75">Already paid: ${formatUSDC(reveal.amountPaid)} USDC</p>
                   )}
                   <p className={`text-xs mt-1 ${isExpired ? "font-bold" : ""}`}>
                     {isExpired ? "⚠️ EXPIRED - Cannot collect" : `${blocksRemaining.toString()} blocks remaining`}

@@ -1,5 +1,3 @@
-import { formatEther } from "viem";
-
 interface ResultDisplayProps {
   commitId: bigint | null;
   isPolling: boolean;
@@ -8,6 +6,12 @@ interface ResultDisplayProps {
   expectedPayout: bigint;
   payoutMultiplier: bigint | undefined;
 }
+
+// Format USDC amount (6 decimals)
+const formatUSDC = (amount: bigint): string => {
+  const usdcAmount = Number(amount) / 1e6;
+  return usdcAmount.toFixed(2);
+};
 
 export function ResultDisplay({
   commitId,
@@ -43,8 +47,8 @@ export function ResultDisplay({
           <p className="text-xl">{isWinner ? "🎉 WINNER! 🎉" : "Not a winner this time"}</p>
           {isWinner && expectedPayout > 0n && (
             <p className="text-sm mt-3 opacity-90">
-              Your {payoutMultiplier?.toString()}x payout ({Number(formatEther(expectedPayout)).toFixed(5)} ETH) has
-              been added to Uncollected Winnings below. Scroll down to collect!
+              Your {payoutMultiplier?.toString()}x payout (${formatUSDC(expectedPayout)} USDC) has been added to
+              Uncollected Winnings below. Scroll down to collect!
             </p>
           )}
         </div>

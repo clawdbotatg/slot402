@@ -21,12 +21,14 @@ export const wagmiConfig = createConfig({
     let rpcFallbacks = [http()];
     const rpcOverrideUrl = (scaffoldConfig.rpcOverrides as ScaffoldConfig["rpcOverrides"])?.[chain.id];
     if (rpcOverrideUrl) {
-      rpcFallbacks = [http(rpcOverrideUrl), http()];
+      // Use ONLY the override URL without fallback
+      rpcFallbacks = [http(rpcOverrideUrl)];
     } else {
       const alchemyHttpUrl = getAlchemyHttpUrl(chain.id);
       if (alchemyHttpUrl) {
         const isUsingDefaultKey = scaffoldConfig.alchemyApiKey === DEFAULT_ALCHEMY_API_KEY;
-        rpcFallbacks = isUsingDefaultKey ? [http(), http(alchemyHttpUrl)] : [http(alchemyHttpUrl), http()];
+        // If using custom API key, use ONLY Alchemy without fallback
+        rpcFallbacks = isUsingDefaultKey ? [http(), http(alchemyHttpUrl)] : [http(alchemyHttpUrl)];
       }
     }
     return createClient({

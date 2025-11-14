@@ -1,16 +1,20 @@
-import { formatEther } from "viem";
-
 interface ContractStatusProps {
   currentPhase: number | undefined;
   currentBlockNumber: bigint | undefined;
-  contractEthBalance: { value: bigint } | undefined;
+  contractUsdcBalance: bigint | undefined;
   commitCount: bigint | undefined;
 }
+
+// Format USDC amount (6 decimals)
+const formatUSDC = (amount: bigint): string => {
+  const usdcAmount = Number(amount) / 1e6;
+  return usdcAmount.toFixed(2);
+};
 
 export function ContractStatus({
   currentPhase,
   currentBlockNumber,
-  contractEthBalance,
+  contractUsdcBalance,
   commitCount,
 }: ContractStatusProps) {
   const phaseText = currentPhase === 0 ? "SALE" : currentPhase === 1 ? "ACTIVE" : "UNKNOWN";
@@ -30,7 +34,7 @@ export function ContractStatus({
         <div>
           <p className="text-sm opacity-70">Contract Balance</p>
           <p className="text-xl font-bold">
-            {contractEthBalance ? Number(formatEther(contractEthBalance.value)).toFixed(6) : "0.000000"} ETH
+            {contractUsdcBalance ? `$${formatUSDC(contractUsdcBalance)} USDC` : "$0.00 USDC"}
           </p>
         </div>
         <div>
