@@ -4,10 +4,9 @@
 
 **Live at**: [https://slot402.com](https://slot402.com) (coming soon)
 
-The world's first **fully gasless** on-chain slot machine powered by x402 payments and EIP-3009.
+A **fully gasless** on-chain slot machine powered by x402 payments and EIP-3009.
 
-- **Zero gas fees** for players
-- **Instant automatic payouts**
+- **Fully x402 compliant**
 - **Provably fair** (commit-reveal on Base L2)
 - **Live on Base Mainnet**
 
@@ -673,7 +672,3 @@ This is an educational project showcasing:
 - Automated treasury management with Uniswap
 
 **Play responsibly and understand the risks!**
-
----
-
-Made with ❤️ by the Scaffold-ETH community
