@@ -21,3 +21,7 @@ node_modules
 
 # cli
 dist
+
+# SSL certificates
+packages/x402-server/server.cert
+packages/x402-server/server.key
