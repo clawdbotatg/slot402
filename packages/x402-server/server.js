@@ -622,20 +622,22 @@ async function start() {
     const credentials = { key: privateKey, cert: certificate };
 
     const httpsServer = https.createServer(credentials, app);
-    httpsServer.listen(PORT, () => {
+    httpsServer.listen(PORT, '0.0.0.0', () => {
       console.log(`\n🚀 Slot402 x402 Server running!`);
       console.log(`   🔒 HTTPS enabled`);
-      console.log(`   API: https://localhost:${PORT}`);
-      console.log(`   Health: https://localhost:${PORT}/health`);
+      console.log(`   API: https://0.0.0.0:${PORT} (accessible externally)`);
+      console.log(`   Health: https://0.0.0.0:${PORT}/health`);
+      console.log(`   External URL: https://api.slot402.com:${PORT}`);
       console.log(`\n✅ Ready to process x402 slot rolls!\n`);
     });
   } else {
     // Start HTTP server (fallback)
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`\n🚀 Slot402 x402 Server running!`);
       console.log(`   ⚠️  HTTP mode (no SSL certificates found)`);
-      console.log(`   API: http://localhost:${PORT}`);
-      console.log(`   Health: http://localhost:${PORT}/health`);
+      console.log(`   API: http://0.0.0.0:${PORT} (accessible externally)`);
+      console.log(`   Health: http://0.0.0.0:${PORT}/health`);
+      console.log(`   External URL: http://api.slot402.com:${PORT}`);
       console.log(`\n✅ Ready to process x402 slot rolls!\n`);
     });
   }
