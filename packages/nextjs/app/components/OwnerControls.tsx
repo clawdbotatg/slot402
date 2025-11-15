@@ -138,7 +138,7 @@ export function OwnerControls({ connectedAddress }: OwnerControlsProps) {
         <h3 className="text-lg font-semibold mb-2">Liquidity</h3>
         <div className="flex gap-2 flex-wrap">
           <button className="btn btn-error" onClick={handleAddLiquidity}>
-            Add Liquidity (0.15 USDC + 150 tokens)
+            Add Liquidity (3.65 USDC + 3650 tokens)
           </button>
           <button className="btn btn-error" onClick={handleRemoveLiquidity}>
             Remove Liquidity

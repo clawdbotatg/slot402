@@ -19,12 +19,12 @@ export function TokenSalePhase() {
   // Swap ETH for USDC function
   const handleSwapETHForUSDC = async () => {
     try {
-      // Swap 0.001 ETH for USDC (should get way more than 1.5 USDC needed)
-      const ethAmount = parseEther("0.001");
+      // Swap 0.01 ETH for USDC (should get around $25 USDC, enough for the $20 token sale)
+      const ethAmount = parseEther("0.01");
       const deadline = Math.floor(Date.now() / 1000) + 60 * 20; // 20 minutes
       const path = [WETH_ADDRESS, USDC_ADDRESS];
 
-      console.log("🔄 Swapping 0.001 ETH for USDC...");
+      console.log("🔄 Swapping 0.01 ETH for USDC...");
       console.log("Path:", path);
       console.log("Deadline:", deadline);
 
@@ -151,10 +151,10 @@ export function TokenSalePhase() {
   };
 
   // Calculate remaining tokens
-  const tokensRemaining = maxSaleTokens && totalSupply ? Number(formatEther(maxSaleTokens - totalSupply)) : 1500;
+  const tokensRemaining = maxSaleTokens && totalSupply ? Number(formatEther(maxSaleTokens - totalSupply)) : 20000;
   const tokensSold = totalSupply ? Number(formatEther(totalSupply)) : 0;
-  const maxTokens = maxSaleTokens ? Number(formatEther(maxSaleTokens)) : 1500;
-  const usdcRemaining = (tokensRemaining * 0.001).toFixed(4);
+  const maxTokens = maxSaleTokens ? Number(formatEther(maxSaleTokens)) : 20000;
+  const usdcRemaining = (tokensRemaining * 0.001).toFixed(2);
   const progressPercent = ((tokensSold / maxTokens) * 100).toFixed(1);
 
   // Format USDC balance and allowance
@@ -173,7 +173,7 @@ export function TokenSalePhase() {
         Buy tokens at <span className="font-bold">$0.001 USDC</span> each to fund the slot machine bankroll.
       </p>
       <p className="mb-4 text-sm opacity-80">
-        Target: {maxTokens.toLocaleString()} tokens ($1.50 USDC) to reach treasury threshold of $1.35 USDC
+        Target: {maxTokens.toLocaleString()} tokens ($20.00 USDC) to reach treasury threshold of $16.35 USDC
       </p>
 
       {/* USDC Info */}
@@ -187,13 +187,13 @@ export function TokenSalePhase() {
             <span className="opacity-70">USDC Allowance:</span>
             <span className="font-mono font-bold">{formattedAllowance}</span>
           </div>
-          {usdcBalance !== undefined && usdcBalance < BigInt(1500000) && (
+          {usdcBalance !== undefined && usdcBalance < BigInt(20000000) && (
             <div className="alert alert-warning text-xs p-2 mt-2 space-y-2">
               <div>
-                ⚠️ Insufficient USDC. You need ${(1500000 / 1000000).toFixed(2)} USDC to buy all remaining tokens.
+                ⚠️ Insufficient USDC. You need ${(20000000 / 1000000).toFixed(2)} USDC to buy all remaining tokens.
               </div>
               <button className="btn btn-primary btn-xs w-full" onClick={handleSwapETHForUSDC}>
-                💱 Swap 0.001 ETH for USDC
+                💱 Swap 0.01 ETH for USDC
               </button>
             </div>
           )}

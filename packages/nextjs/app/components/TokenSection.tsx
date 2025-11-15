@@ -344,8 +344,8 @@ export const TokenSection = () => {
                 <div className="text-3xl">✅</div>
                 <div>
                   <div className="font-bold text-green-300 mb-1">
-                    Treasury Surplus ({">"} ${treasuryThreshold ? (Number(treasuryThreshold) / 1e6).toFixed(2) : "1.35"}{" "}
-                    USDC)
+                    Treasury Surplus ({">"} $
+                    {treasuryThreshold ? (Number(treasuryThreshold) / 1e6).toFixed(2) : "16.35"} USDC)
                   </div>
                   <div className="text-sm text-gray-300">
                     The contract automatically buys $S402 tokens from Uniswap and burns them, reducing supply and
@@ -372,7 +372,7 @@ export const TokenSection = () => {
               💡 This mechanism ensures the slot machine always has enough funds to pay winners while creating buying
               pressure during profitable periods. The treasury threshold of{" "}
               <span className="text-yellow-300 font-bold">
-                ${treasuryThreshold ? (Number(treasuryThreshold) / 1e6).toFixed(2) : "1.35"} USDC
+                ${treasuryThreshold ? (Number(treasuryThreshold) / 1e6).toFixed(2) : "16.35"} USDC
               </span>{" "}
               acts as a reserve buffer.
             </div>
