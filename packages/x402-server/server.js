@@ -10,6 +10,10 @@ const cors = require("cors");
 const { ethers } = require("ethers");
 const dotenv = require("dotenv");
 const { createPaymentRequirements, verifyPayment } = require("a2a-x402");
+const fs = require("fs");
+const https = require("https");
+const http = require("http");
+const path = require("path");
 
 dotenv.config();
 
@@ -35,7 +39,6 @@ if (!USDC_CONTRACT || !BASE_RPC_URL) {
 // Load deployed contracts from Foundry broadcast
 console.log(`🔍 Loading deployment for chain ID: ${CHAIN_ID}`);
 
-const path = require("path");
 const broadcastPath = path.join(
   __dirname,
   "../foundry/broadcast/Deploy.s.sol",
@@ -55,7 +58,6 @@ try {
   console.error(`   Deploy to chain ${CHAIN_ID} first: yarn deploy`);
 
   // Debug: check if file exists
-  const fs = require("fs");
   if (fs.existsSync(broadcastPath)) {
     console.error(`   ℹ️  File exists but couldn't be loaded!`);
     console.error(`   This might be a require cache issue.`);
@@ -608,12 +610,35 @@ async function start() {
   // Load reel configurations from contract
   await loadReels();
 
-  app.listen(PORT, () => {
-    console.log(`\n🚀 Slot402 x402 Server running!`);
-    console.log(`   API: http://localhost:${PORT}`);
-    console.log(`   Health: http://localhost:${PORT}/health`);
-    console.log(`\n✅ Ready to process x402 slot rolls!\n`);
-  });
+  // Check for SSL certificates
+  const keyPath = path.join(__dirname, "server.key");
+  const certPath = path.join(__dirname, "server.cert");
+  const hasSSL = fs.existsSync(keyPath) && fs.existsSync(certPath);
+
+  if (hasSSL) {
+    // Start HTTPS server
+    const privateKey = fs.readFileSync(keyPath, "utf8");
+    const certificate = fs.readFileSync(certPath, "utf8");
+    const credentials = { key: privateKey, cert: certificate };
+
+    const httpsServer = https.createServer(credentials, app);
+    httpsServer.listen(PORT, () => {
+      console.log(`\n🚀 Slot402 x402 Server running!`);
+      console.log(`   🔒 HTTPS enabled`);
+      console.log(`   API: https://localhost:${PORT}`);
+      console.log(`   Health: https://localhost:${PORT}/health`);
+      console.log(`\n✅ Ready to process x402 slot rolls!\n`);
+    });
+  } else {
+    // Start HTTP server (fallback)
+    app.listen(PORT, () => {
+      console.log(`\n🚀 Slot402 x402 Server running!`);
+      console.log(`   ⚠️  HTTP mode (no SSL certificates found)`);
+      console.log(`   API: http://localhost:${PORT}`);
+      console.log(`   Health: http://localhost:${PORT}/health`);
+      console.log(`\n✅ Ready to process x402 slot rolls!\n`);
+    });
+  }
 }
 
 start().catch((error) => {
