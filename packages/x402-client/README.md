@@ -28,8 +28,10 @@ PRIVATE_KEY=your_private_key_here
 # Base Mainnet RPC URL
 BASE_RPC_URL=https://mainnet.base.org
 
-# x402 Server URL
-SERVER_URL=http://localhost:3000
+# x402 Server URL (production or local)
+SERVER_URL=https://api.slot402.com:8000
+# Or for local development:
+# SERVER_URL=http://localhost:8000
 
 # USDC contract on Base
 USDC_CONTRACT=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
@@ -72,7 +74,7 @@ The client will:
 💼 Client Configuration:
   Wallet: 0x1234...
   Network: Base Mainnet
-  Server: http://localhost:3000
+  Server: https://api.slot402.com:8000
   USDC: 0x833589...
 
 🎰 Requesting slot roll via x402...
@@ -156,8 +158,9 @@ SLOT ROLL RESULT
 
 **"Server connection refused"**
 
-- Start the server: `yarn server`
-- Check SERVER_URL in .env (default: http://localhost:3000)
+- Check production server: `curl https://api.slot402.com:8000/health`
+- Or start local server: `yarn server`
+- Verify SERVER_URL in .env matches your server
 
 ## Environment Variables
 
@@ -165,7 +168,7 @@ SLOT ROLL RESULT
 | ------------- | ----------------------- | ------------------------ |
 | PRIVATE_KEY   | Your wallet private key | 0x...                    |
 | BASE_RPC_URL  | Base RPC endpoint       | https://mainnet.base.org |
-| SERVER_URL    | x402 server             | http://localhost:3000    |
+| SERVER_URL    | x402 server             | https://api.slot402.com:8000 |
 | USDC_CONTRACT | USDC on Base            | 0x833589...              |
 
 ## Security Notes

@@ -2,6 +2,10 @@
 
 HTTP server that handles gasless slot machine rolls using the x402 payment protocol.
 
+**Production Server**: `https://api.slot402.com:8000`
+
+This README covers running your own x402 server instance.
+
 ## Overview
 
 This server:

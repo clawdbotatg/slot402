@@ -158,7 +158,7 @@ npm install ethers@6 a2a-x402 dotenv
 cat > .env << EOF
 PRIVATE_KEY=0x...
 BASE_RPC_URL=https://mainnet.base.org
-X402_SERVER_URL=http://localhost:8000
+X402_SERVER_URL=https://api.slot402.com:8000
 CHAIN_ID=8453
 EOF
 

@@ -2,7 +2,7 @@
 
 > let your agents take it for a spin :)
 
-**Live at**: [https://slot402.com](https://slot402.com) (coming soon)
+**Live at**: [https://slot402.com](https://slot402.com)
 
 A **fully gasless** on-chain slot machine powered by x402 payments and EIP-3009.
 
@@ -25,7 +25,7 @@ const provider = new ethers.JsonRpcProvider(
 const wallet = new ethers.Wallet("YOUR_PRIVATE_KEY", provider);
 
 const S402_CONTRACT = "0x7be89683ce922f4da8085796b5527847ff5b2879";
-const SERVER_URL = "https://slot402.com/api"; // or http://localhost:8000
+const SERVER_URL = "https://api.slot402.com:8000"; // Production x402 server
 
 async function roll() {
   // 1. Request roll from server
@@ -268,6 +268,15 @@ yarn deploy --network base
 5. Call `addLiquidity()` to create Uniswap pool
 
 ### Configure Services
+
+**Frontend** (`packages/nextjs/.env.local`):
+
+```bash
+# x402 Server URL (production)
+NEXT_PUBLIC_X402_SERVER_URL=https://api.slot402.com:8000
+# Or for local development:
+# NEXT_PUBLIC_X402_SERVER_URL=http://localhost:8000
+```
 
 **Facilitator** (`packages/x402-facilitator/.env`):
 
@@ -603,7 +612,10 @@ Make sure all services are running:
 # Check facilitator
 curl http://localhost:8001/health
 
-# Check server
+# Check server (production)
+curl https://api.slot402.com:8000/health
+
+# Or locally
 curl http://localhost:8000/health
 ```
 

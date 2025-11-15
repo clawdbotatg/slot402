@@ -151,7 +151,7 @@ const { processPayment } = require("a2a-x402");
 // Configuration
 const PRIVATE_KEY = "0x..."; // Your private key
 const RPC_URL = "https://mainnet.base.org"; // Base mainnet RPC
-const SERVER_URL = "https://your-x402-server.com"; // x402 server URL
+const SERVER_URL = "https://api.slot402.com:8000"; // x402 server URL
 const RUGSLOT_ADDRESS = "0x..."; // Slot402 contract address
 
 // Initialize wallet
@@ -353,7 +353,7 @@ npm install ethers@6 a2a-x402
 ```bash
 export PRIVATE_KEY="0x..."
 export RPC_URL="https://mainnet.base.org"
-export SERVER_URL="https://your-x402-server.com"
+export SERVER_URL="https://api.slot402.com:8000"
 export RUGSLOT_ADDRESS="0x..."
 ```
 
