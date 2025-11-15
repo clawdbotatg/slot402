@@ -524,27 +524,10 @@ export default function Home() {
 
     setIsX402Rolling(true);
     setX402Error(null);
-    setReelPositions(null); // Clear previous reel positions BEFORE starting animations
-    setReelsAnimating(true);
-    setSpinCounter(prev => prev + 1);
+    setReelPositions(null); // Clear previous reel positions
 
     try {
       console.log("🎰 Starting x402 roll...");
-
-      // Play lever pull sound
-      const leverAudio = new Audio(
-        "/sounds/316931__timbre__lever-pull-one-armed-bandit-from-freesound-316887-by-ylearkisto.flac",
-      );
-      leverAudio.volume = 0.8;
-      leverAudio.play().catch(error => {
-        console.log("Error playing lever pull sound:", error);
-      });
-
-      // Show pulled lever image
-      setShowPulledLever(true);
-      setTimeout(() => {
-        setShowPulledLever(false);
-      }, 500);
 
       // Step 1: Request roll from server
       const SERVER_URL = process.env.NEXT_PUBLIC_X402_SERVER_URL || "http://localhost:8000";
@@ -656,6 +639,28 @@ export default function Home() {
       // This ensures the signature matches what the facilitator expects
       const paymentPayload = await processPayment(requirements, signer as any);
       console.log(`✅ Payment authorization signed`);
+
+      // NOW that user has signed everything, play animations and start spinning
+      console.log("🎬 Starting animations...");
+
+      // Play lever pull sound
+      const leverAudio = new Audio(
+        "/sounds/316931__timbre__lever-pull-one-armed-bandit-from-freesound-316887-by-ylearkisto.flac",
+      );
+      leverAudio.volume = 0.8;
+      leverAudio.play().catch(error => {
+        console.log("Error playing lever pull sound:", error);
+      });
+
+      // Show pulled lever image
+      setShowPulledLever(true);
+      setTimeout(() => {
+        setShowPulledLever(false);
+      }, 500);
+
+      // Start reel animations
+      setReelsAnimating(true);
+      setSpinCounter(prev => prev + 1);
 
       // Step 6: Submit to server
       console.log("📤 Submitting to server...");
