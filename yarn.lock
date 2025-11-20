@@ -1202,6 +1202,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@farcaster/miniapp-wagmi-connector@npm:^1.1.0":
+  version: 1.1.0
+  resolution: "@farcaster/miniapp-wagmi-connector@npm:1.1.0"
+  peerDependencies:
+    "@farcaster/miniapp-sdk": ^0.2.0
+    "@wagmi/core": ^2.14.1
+    viem: ^2.21.55
+  checksum: 45b18ed314a1cb712c5ef2a555178690d23f3cb261905fea2ec38eea6a5986476f44b972b9c7226ca34dc75b9af202aa66cf8643705915d9837c172d74239069
+  languageName: node
+  linkType: hard
+
 "@farcaster/quick-auth@npm:^0.0.6":
   version: 0.0.6
   resolution: "@farcaster/quick-auth@npm:0.0.6"
@@ -3120,6 +3131,7 @@ __metadata:
   resolution: "@se-2/nextjs@workspace:packages/nextjs"
   dependencies:
     "@farcaster/miniapp-sdk": ^0.2.1
+    "@farcaster/miniapp-wagmi-connector": ^1.1.0
     "@heroicons/react": ~2.1.5
     "@rainbow-me/rainbowkit": 2.2.8
     "@tailwindcss/postcss": 4.0.15

@@ -1,6 +1,8 @@
+import { farcasterMiniApp } from "@farcaster/miniapp-wagmi-connector";
 import { connectorsForWallets } from "@rainbow-me/rainbowkit";
 import {
   coinbaseWallet,
+  injectedWallet,
   ledgerWallet,
   metaMaskWallet,
   rainbowWallet,
@@ -24,6 +26,7 @@ export const wagmiConnectors = () => {
   }
 
   const wallets = [
+    injectedWallet,
     metaMaskWallet,
     walletConnectWallet,
     ledgerWallet,
@@ -35,7 +38,7 @@ export const wagmiConnectors = () => {
       : []),
   ];
 
-  return connectorsForWallets(
+  const rainbowKitConnectors = connectorsForWallets(
     [
       {
         groupName: "Supported Wallets",
@@ -48,4 +51,6 @@ export const wagmiConnectors = () => {
       projectId: scaffoldConfig.walletConnectProjectId,
     },
   );
+
+  return [farcasterMiniApp(), ...rainbowKitConnectors];
 };
