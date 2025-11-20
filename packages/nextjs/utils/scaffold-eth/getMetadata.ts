@@ -52,5 +52,21 @@ export const getMetadata = ({
         },
       ],
     },
+    other: {
+      "fc:miniapp": JSON.stringify({
+        version: "next",
+        imageUrl,
+        button: {
+          title,
+          action: {
+            type: "launch_miniapp",
+            name: title,
+            url: baseUrl,
+            splashImageUrl: `${baseUrl}/splash.png`,
+            splashBackgroundColor: "#1C3C45",
+          },
+        },
+      }),
+    },
   };
 };

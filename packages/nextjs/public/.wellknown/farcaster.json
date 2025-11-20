@@ -1,0 +1,28 @@
+{
+  "accountAssociation": {
+    "header": "",
+    "payload": "",
+    "signature": ""
+  },
+  "baseBuilder": {
+    "ownerAddress": "0x"
+  },
+  "miniapp": {
+    "version": "1",
+    "name": "Slot402",
+    "homeUrl": "https://slot402.com/",
+    "iconUrl": "https://slot402.com/icon.png",
+    "splashImageUrl": "https://slot402.com/splash.png",
+    "splashBackgroundColor": "#1C3C45",
+    "subtitle": "A decentralized slot machine built on Base",
+    "description": "A decentralized slot machine built on Base",
+    "primaryCategory": "games",
+    "tags": ["x402", "entertainment", "games"],
+    "heroImageUrl": "https://slot402.com/hero.png",
+    "tagline": "A decentralized slot machine built on Base",
+    "ogTitle": "Slot402 - A decentralized slot machine built on Base",
+    "ogDescription": "A decentralized slot machine built on Base",
+    "ogImageUrl": "https://slot402.com/preview.png",
+    "noindex": true
+  }
+}
