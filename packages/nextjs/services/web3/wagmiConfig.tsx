@@ -1,4 +1,5 @@
 import { wagmiConnectors } from "./wagmiConnectors";
+import { farcasterMiniApp as miniAppConnector } from "@farcaster/miniapp-wagmi-connector";
 import { Chain, createClient, fallback, http } from "viem";
 import { hardhat, mainnet } from "viem/chains";
 import { createConfig } from "wagmi";
@@ -14,21 +15,18 @@ export const enabledChains = targetNetworks.find((network: Chain) => network.id 
 
 export const wagmiConfig = createConfig({
   chains: enabledChains,
-  connectors: wagmiConnectors(),
+  connectors: [miniAppConnector(), ...wagmiConnectors()],
   ssr: true,
-  multiInjectedProviderDiscovery: false,
   client: ({ chain }) => {
     let rpcFallbacks = [http()];
     const rpcOverrideUrl = (scaffoldConfig.rpcOverrides as ScaffoldConfig["rpcOverrides"])?.[chain.id];
     if (rpcOverrideUrl) {
-      // Use ONLY the override URL without fallback
-      rpcFallbacks = [http(rpcOverrideUrl)];
+      rpcFallbacks = [http(rpcOverrideUrl), http()];
     } else {
       const alchemyHttpUrl = getAlchemyHttpUrl(chain.id);
       if (alchemyHttpUrl) {
         const isUsingDefaultKey = scaffoldConfig.alchemyApiKey === DEFAULT_ALCHEMY_API_KEY;
-        // If using custom API key, use ONLY Alchemy without fallback
-        rpcFallbacks = isUsingDefaultKey ? [http(), http(alchemyHttpUrl)] : [http(alchemyHttpUrl)];
+        rpcFallbacks = isUsingDefaultKey ? [http(), http(alchemyHttpUrl)] : [http(alchemyHttpUrl), http()];
       }
     }
     return createClient({
