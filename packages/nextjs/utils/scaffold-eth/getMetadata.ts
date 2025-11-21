@@ -57,12 +57,12 @@ export const getMetadata = ({
         version: "next",
         imageUrl,
         button: {
-          title,
+          title: "Play Slot402",
           action: {
             type: "launch_miniapp",
-            name: "Play Slot402",
-            url: baseUrl,
-            splashImageUrl: `${baseUrl}/splash.png`,
+            name: "Slot402",
+            url: "https://slot402-mini.vercel.app/",
+            splashImageUrl: `https://slot402-mini.vercel.app/splash.png`,
             splashBackgroundColor: "#1C3C45",
           },
         },
