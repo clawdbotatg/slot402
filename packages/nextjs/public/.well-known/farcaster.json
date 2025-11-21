@@ -23,6 +23,6 @@
     "ogTitle": "Slot402 - A decentralized slot machine built on Base",
     "ogDescription": "A decentralized slot machine built on Base",
     "ogImageUrl": "https://slot402.com/preview.png",
-    "noindex": true
+    "noindex": false
   }
 }
