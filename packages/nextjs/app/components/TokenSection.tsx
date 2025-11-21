@@ -173,8 +173,10 @@ export const TokenSection = () => {
         {tokenPriceInUsdc && (
           <div className="p-8 rounded-lg border-4 border-black text-center" style={{ backgroundColor: "#1c3d45" }}>
             <div className="text-sm text-gray-400 mb-2 uppercase tracking-wider">$S402 Token Price</div>
-            <div className="text-6xl font-bold text-green-400 mb-2">${parseFloat(tokenPriceInUsdc).toFixed(6)}</div>
-            <div className="text-xl text-gray-300">USDC per token</div>
+            <div className="text-2xl md:text-6xl font-bold text-green-400 mb-2">
+              ${parseFloat(tokenPriceInUsdc).toFixed(6)}
+            </div>
+            <div className="text-lg md:text-xl text-gray-300">USDC per token</div>
           </div>
         )}
 

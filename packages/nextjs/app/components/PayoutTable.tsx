@@ -76,102 +76,146 @@ export const PayoutTable = () => {
   ];
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-6 rounded-lg" style={{ backgroundColor: "#2d5a66" }}>
-      <h2
-        className="text-2xl font-bold text-center mb-6 text-white"
-        style={{ textShadow: "2px 2px 4px rgba(0,0,0,0.5)" }}
-      >
-        💰 PAYOUT TABLE 💰
-      </h2>
+    <>
+      <style jsx>{`
+        @media (max-width: 768px) {
+          .payout-symbol-img {
+            width: 24px !important;
+            height: 24px !important;
+          }
+          .payout-cell {
+            padding: 0.5rem !important;
+            font-size: 0.75rem !important;
+          }
+          .payout-symbols-container {
+            flex-direction: column !important;
+            align-items: center !important;
+            gap: 0.5rem !important;
+          }
+          .payout-symbols-row {
+            gap: 0.5rem !important;
+          }
+          .payout-multiplier {
+            font-size: 0.875rem !important;
+          }
+          .payout-amount {
+            font-size: 0.875rem !important;
+          }
+          .payout-description {
+            font-size: 0.75rem !important;
+            word-break: break-word !important;
+          }
+          .payout-header {
+            padding: 0.5rem !important;
+            font-size: 0.75rem !important;
+          }
+        }
+      `}</style>
+      <div className="w-full max-w-4xl mx-auto p-6 rounded-lg" style={{ backgroundColor: "#2d5a66" }}>
+        <h2
+          className="text-2xl font-bold text-center mb-6 text-white"
+          style={{ textShadow: "2px 2px 4px rgba(0,0,0,0.5)" }}
+        >
+          💰 PAYOUT TABLE 💰
+        </h2>
 
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr style={{ backgroundColor: "#1c3d45" }}>
-              <th className="p-3 text-left text-white font-bold border-2 border-black">Combination</th>
-              <th className="p-3 text-center text-white font-bold border-2 border-black">Multiplier</th>
-              <th className="p-3 text-right text-white font-bold border-2 border-black">Payout</th>
-            </tr>
-          </thead>
-          <tbody>
-            {payouts.map((payout, index) => {
-              const payoutAmountUsdc = BET_SIZE_USDC * payout.multiplier;
-              const payoutAmountFormatted = payoutAmountUsdc.toFixed(2);
-              const isSpecial = payout.symbol === "BASEETH" || payout.symbol === "SEVEN";
-              const rowColor = index % 2 === 0 ? "#3a6b78" : "#2d5a66";
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr style={{ backgroundColor: "#1c3d45" }}>
+                <th className="p-3 text-left text-white font-bold border-2 border-black payout-header">Combination</th>
+                <th className="p-3 text-center text-white font-bold border-2 border-black payout-header">Multiplier</th>
+                <th className="p-3 text-right text-white font-bold border-2 border-black payout-header">Payout</th>
+              </tr>
+            </thead>
+            <tbody>
+              {payouts.map((payout, index) => {
+                const payoutAmountUsdc = BET_SIZE_USDC * payout.multiplier;
+                const payoutAmountFormatted = payoutAmountUsdc.toFixed(2);
+                const isSpecial = payout.symbol === "BASEETH" || payout.symbol === "SEVEN";
+                const rowColor = index % 2 === 0 ? "#3a6b78" : "#2d5a66";
 
-              return (
-                <tr
-                  key={payout.symbol}
-                  style={{
-                    backgroundColor: rowColor,
-                    borderLeft: isSpecial ? "4px solid gold" : "none",
-                  }}
-                  className="hover:brightness-110 transition-all"
-                >
-                  <td className="p-3 border-2 border-black">
-                    <div className="flex items-center gap-3">
-                      {payout.symbol === "ANYBAR" ? (
-                        <div className="flex gap-1">
-                          <Image src="/slot/bar.png" alt="Bar" width={40} height={40} className="object-contain" />
-                          <Image
-                            src="/slot/doublebar.png"
-                            alt="Double Bar"
-                            width={40}
-                            height={40}
-                            className="object-contain"
-                          />
-                        </div>
-                      ) : (
-                        <>
-                          <Image
-                            src={payout.symbolImage}
-                            alt={payout.symbol}
-                            width={40}
-                            height={40}
-                            className="object-contain"
-                          />
-                          <Image
-                            src={payout.symbolImage}
-                            alt={payout.symbol}
-                            width={40}
-                            height={40}
-                            className="object-contain"
-                          />
-                          <Image
-                            src={payout.symbolImage}
-                            alt={payout.symbol}
-                            width={40}
-                            height={40}
-                            className="object-contain"
-                          />
-                        </>
-                      )}
-                      <span className="text-white font-semibold">{payout.description}</span>
-                    </div>
-                  </td>
-                  <td className="p-3 text-center border-2 border-black">
-                    <span className="text-yellow-300 font-bold text-lg">{payout.multiplier}x</span>
-                  </td>
-                  <td className="p-3 text-right border-2 border-black">
-                    <div className="flex flex-col items-end">
-                      <span className="text-green-300 font-bold text-lg">${payoutAmountFormatted} USDC</span>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                return (
+                  <tr
+                    key={payout.symbol}
+                    style={{
+                      backgroundColor: rowColor,
+                      borderLeft: isSpecial ? "4px solid gold" : "none",
+                    }}
+                    className="hover:brightness-110 transition-all"
+                  >
+                    <td className="p-3 border-2 border-black payout-cell">
+                      <div className="flex items-center gap-3 payout-symbols-container">
+                        {payout.symbol === "ANYBAR" ? (
+                          <div className="flex gap-1 payout-symbols-row">
+                            <Image
+                              src="/slot/bar.png"
+                              alt="Bar"
+                              width={40}
+                              height={40}
+                              className="object-contain payout-symbol-img"
+                            />
+                            <Image
+                              src="/slot/doublebar.png"
+                              alt="Double Bar"
+                              width={40}
+                              height={40}
+                              className="object-contain payout-symbol-img"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex gap-1 payout-symbols-row">
+                            <Image
+                              src={payout.symbolImage}
+                              alt={payout.symbol}
+                              width={40}
+                              height={40}
+                              className="object-contain payout-symbol-img"
+                            />
+                            <Image
+                              src={payout.symbolImage}
+                              alt={payout.symbol}
+                              width={40}
+                              height={40}
+                              className="object-contain payout-symbol-img"
+                            />
+                            <Image
+                              src={payout.symbolImage}
+                              alt={payout.symbol}
+                              width={40}
+                              height={40}
+                              className="object-contain payout-symbol-img"
+                            />
+                          </div>
+                        )}
+                        <span className="text-white font-semibold payout-description">{payout.description}</span>
+                      </div>
+                    </td>
+                    <td className="p-3 text-center border-2 border-black payout-cell">
+                      <span className="text-yellow-300 font-bold text-lg payout-multiplier">{payout.multiplier}x</span>
+                    </td>
+                    <td className="p-3 text-right border-2 border-black payout-cell">
+                      <div className="flex flex-col items-end">
+                        <span className="text-green-300 font-bold text-lg payout-amount">
+                          ${payoutAmountFormatted} USDC
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-4 text-center text-sm text-gray-300">
+          <p>Bet Size: ${BET_SIZE_USDC} USDC per spin</p>
+          <p className="mt-1">
+            <span className="text-yellow-300">⚡</span> Any Bar Combo = Any mix of BAR and DOUBLE BAR{" "}
+            <span className="text-yellow-300">⚡</span>
+          </p>
+        </div>
       </div>
-
-      <div className="mt-4 text-center text-sm text-gray-300">
-        <p>Bet Size: ${BET_SIZE_USDC} USDC per spin</p>
-        <p className="mt-1">
-          <span className="text-yellow-300">⚡</span> Any Bar Combo = Any mix of BAR and DOUBLE BAR{" "}
-          <span className="text-yellow-300">⚡</span>
-        </p>
-      </div>
-    </div>
+    </>
   );
 };
