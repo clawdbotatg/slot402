@@ -758,14 +758,15 @@ export default function Home() {
             transform: translateX(-50%) !important;
           }
           .buttons-container-mobile {
+            top: 640px !important;
             left: 50% !important;
-            transform: translateX(-50%) !important;
+            transform: translateX(-50%) scale(1.4) !important;
           }
           .buttons-row-mobile {
-            flex-direction: column !important;
-            gap: 0.75rem !important;
+            gap: 0.5rem !important;
           }
           .error-messages-mobile {
+            top: 860px !important;
             left: auto !important;
             right: 5%;
             width: auto !important;
@@ -784,14 +785,15 @@ export default function Home() {
             transform: translateX(-50%) !important;
           }
           .buttons-container-mobile {
+            top: 640px !important;
             left: 50% !important;
-            transform: translateX(-50%) !important;
+            transform: translateX(-50%) scale(1.4) !important;
           }
           .buttons-row-mobile {
-            flex-direction: column !important;
-            gap: 0.75rem !important;
+            gap: 0.5rem !important;
           }
           .error-messages-mobile {
+            top: 860px !important;
             left: auto !important;
             right: 5%;
             width: auto !important;
@@ -905,7 +907,7 @@ export default function Home() {
                     {/* Error Messages - Positioned separately so they don't push buttons */}
                     <div
                       className="flex flex-col items-center gap-2 error-messages-mobile"
-                      style={{ position: "absolute", top: "680px" }}
+                      style={{ position: "absolute", top: "730px" }}
                     >
                       {rollError && (
                         <div className="alert alert-error w-full">
@@ -1122,7 +1124,7 @@ export default function Home() {
                       <div
                         style={{
                           position: "absolute",
-                          top: "750px",
+                          top: "850px",
                           left: "50%",
                           transform: "translateX(-50%)",
                           zIndex: 100,
