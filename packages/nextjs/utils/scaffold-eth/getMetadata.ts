@@ -60,7 +60,7 @@ export const getMetadata = ({
           title,
           action: {
             type: "launch_miniapp",
-            name: title,
+            name: "Play Slot402",
             url: baseUrl,
             splashImageUrl: `${baseUrl}/splash.png`,
             splashBackgroundColor: "#1C3C45",

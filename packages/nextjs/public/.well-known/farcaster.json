@@ -10,19 +10,19 @@
   "miniapp": {
     "version": "1",
     "name": "Slot402",
-    "homeUrl": "https://slot402.com/",
-    "iconUrl": "https://slot402.com/icon.png",
-    "splashImageUrl": "https://slot402.com/splash.png",
+    "homeUrl": "https://slot402-mini.vercel.app/",
+    "iconUrl": "https://slot402-mini.vercel.app/icon.png",
+    "splashImageUrl": "https://slot402-mini.vercel.app/splash.png",
     "splashBackgroundColor": "#1C3C45",
     "subtitle": "A decentralized slot machine",
     "description": "A decentralized slot machine built on Base",
     "primaryCategory": "games",
     "tags": ["x402", "entertainment", "games"],
-    "heroImageUrl": "https://slot402.com/hero.png",
+    "heroImageUrl": "https://slot402-mini.vercel.app/hero.png",
     "tagline": "A decentralized slot machine",
     "ogTitle": "A decentralized slot machine",
     "ogDescription": "A decentralized slot machine built on Base",
-    "ogImageUrl": "https://slot402.com/preview.png",
+    "ogImageUrl": "https://slot402-mini.vercel.app/preview.png",
     "noindex": false
   }
 }
