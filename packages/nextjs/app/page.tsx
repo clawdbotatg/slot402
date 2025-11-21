@@ -1221,41 +1221,89 @@ export default function Home() {
                       userSelect: "none",
                     }}
                   >
-                    {`// 1. Request roll from server
-const response = await fetch("/roll", {
+                    {`// Setup: wallet (ethers Wallet/Signer), contract (Slot402 contract instance)
+// CHAIN_ID = 8453 (Base), SLOT402 = contract address
+
+// Request roll from server (returns 402)
+const rollResponse = await fetch("https://api.slot402.com:8000/roll", {
   method: "POST",
-  body: JSON.stringify({ player: userAddress })
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ player: wallet.address })
 });
 
-// 2. Get payment details (402 response)
-const { requestId, accepts } = await response.json();
+if (rollResponse.status !== 402) {
+  throw new Error("Unexpected response: " + rollResponse.status);
+}
 
-// 3. Generate secret and commit hash
-const secret = Math.floor(Math.random() * MAX_SAFE_INT);
-const commitHash = await contract.getCommitHash(secret);
+const payment = await rollResponse.json();
+console.log(\`💳 \${payment.pricing.betSize} + \${payment.pricing.facilitatorFee} fee\`);
 
-// 4. Sign MetaCommit (EIP-712)
-const metaSig = await signTypedDataAsync({
-  domain, types, message
-});
+// Generate secret and get commit data in parallel
+const secret = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString();
+const [commitHash, nonce] = await Promise.all([
+  contract.getCommitHash(BigInt(secret)),
+  contract.nonces(wallet.address)
+]);
 
-// 5. Sign USDC payment (EIP-3009)
-const paymentPayload = await processPayment(accepts[0]);
+// Sign MetaCommit (EIP-712) and payment (EIP-3009) in parallel
+const deadline = Math.floor(Date.now() / 1000) + 300;
+const [metaCommitSig, paymentPayload] = await Promise.all([
+  wallet.signTypedData({
+    domain: {
+      name: "Slot402",
+      version: "1",
+      chainId: BigInt(CHAIN_ID),
+      verifyingContract: SLOT402
+    },
+    types: {
+      MetaCommit: [
+        { name: "player", type: "address" },
+        { name: "commitHash", type: "bytes32" },
+        { name: "nonce", type: "uint256" },
+        { name: "deadline", type: "uint256" }
+      ]
+    },
+    primaryType: "MetaCommit",
+    message: {
+      player: wallet.address,
+      commitHash,
+      nonce,
+      deadline: BigInt(deadline)
+    }
+  }),
+  processPayment(payment.accepts[0], wallet)
+]);
 
-// 6. Submit and get result
-const result = await fetch("/roll/submit", {
+// Submit and get result
+const submitRes = await fetch("https://api.slot402.com:8000/roll/submit", {
   method: "POST",
+  headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
-    requestId,
+    requestId: payment.requestId,
     paymentPayload,
-    metaCommit: { player, commitHash, nonce, signature },
+    metaCommit: {
+      player: wallet.address,
+      commitHash,
+      nonce: nonce.toString(),
+      deadline,
+      signature: metaCommitSig
+    },
     secret
   })
-}).then(r => r.json());
+});
 
-// Done! ✨
-console.log(result.roll.symbols); // ["CHERRY", "SEVEN", "BAR"]
-console.log(result.roll.won); // true`}
+if (!submitRes.ok) {
+  throw new Error("Submit failed: " + submitRes.status);
+}
+
+const result = await submitRes.json();
+const [s1, s2, s3] = result.roll.symbols;
+
+console.log(\`🎰 [ \${s1} ] [ \${s2} ] [ \${s3} ]\`);
+if (result.roll.won) {
+  console.log(\`🏆 WON \${ethers.formatUnits(result.roll.payout, 6)} USDC!\`);
+  console.log(\`✅ https://basescan.org/tx/\${result.roll.claimTransaction}\`);
+}`}
                   </SyntaxHighlighter>
                 </div>
               </div>
