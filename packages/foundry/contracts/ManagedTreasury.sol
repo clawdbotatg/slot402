@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "./Slot402Token.sol";
 import "./BaseConstants.sol";
+import "./VaultManager.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
@@ -26,6 +27,7 @@ abstract contract ManagedTreasury is BaseConstants {
     // ============ State Variables ============
     
     Slot402Token public token;
+    VaultManager public vaultManager;
     address public uniswapPair;
     bool public liquidityAdded;
     
@@ -50,27 +52,90 @@ abstract contract ManagedTreasury is BaseConstants {
     
     // ============ Constructor ============
     
-    constructor(address _tokenAddress) {
+    constructor(address _tokenAddress, address payable _vaultManager) {
         require(_tokenAddress != address(0), "Invalid token address");
+        require(_vaultManager != address(0), "Invalid vault manager address");
         token = Slot402Token(_tokenAddress);
+        vaultManager = VaultManager(_vaultManager);
+    }
+    
+    // ============ Vault Helper Functions ============
+    
+    /**
+     * @dev Get total USDC value (only from vault)
+     * @return Total USDC available
+     */
+    function _getTotalUSDCValue() internal view returns (uint256) {
+        // All USDC should be in vault
+        return vaultManager.getCurrentValue();
+    }
+    
+    /**
+     * @dev Deposit specific amount of USDC to the vault
+     * @param amount Amount to deposit (must be available in contract)
+     */
+    function _depositToVault(uint256 amount) internal {
+        require(amount > 0, "Amount must be > 0");
+        uint256 contractBalance = IERC20(USDC).balanceOf(address(this));
+        require(contractBalance >= amount, "Insufficient USDC in contract");
+        
+        // Transfer USDC to vault manager
+        require(IERC20(USDC).transfer(address(vaultManager), amount), "USDC transfer to vault failed");
+        // Deposit into vault - will revert if it fails
+        vaultManager.depositIntoVault(0);
+    }
+    
+    /**
+     * @dev Top up vault to VAULT_THRESHOLD if total funds allow
+     * @dev Only deposits if we have enough to fully reach threshold (no partial deposits)
+     * @param vaultThreshold The target amount to keep in vault
+     */
+    function _topUpVaultIfNeeded(uint256 vaultThreshold) internal {
+        uint256 contractBalance = IERC20(USDC).balanceOf(address(this));
+        uint256 vaultBalance = vaultManager.getCurrentValue();
+        uint256 totalUSDC = contractBalance + vaultBalance;
+        
+        // Only top up if:
+        // 1. We have enough total funds
+        // 2. Vault is below threshold
+        // 3. We can fully reach the threshold
+        if (totalUSDC >= vaultThreshold && vaultBalance < vaultThreshold) {
+            uint256 needed = vaultThreshold - vaultBalance;
+            if (contractBalance >= needed) {
+                _depositToVault(needed);
+            }
+        }
+    }
+    
+    /**
+     * @dev Withdraw specific amount of USDC from vault to this contract
+     * @param amount Amount to withdraw
+     */
+    function _withdrawFromVault(uint256 amount) internal {
+        if (amount > 0) {
+            vaultManager.withdrawFromVault(amount);
+        }
     }
     
     // ============ Treasury Management ============
     
     /**
      * @dev Try to buyback and burn tokens if we have excess USDC
+     * @dev Uses contract balance only (not vault) to avoid expensive withdrawals
      */
     function _tryBuybackAndBurn() internal {
         if (uniswapPair == address(0)) return; // No pair yet
         
-        uint256 balance = IERC20(USDC).balanceOf(address(this));
+        uint256 totalValue = _getTotalUSDCValue();
+        uint256 contractBalance = IERC20(USDC).balanceOf(address(this));
         
         // Calculate total amount owed to all winners (simplified - just check current balance vs threshold)
-        if (balance > TREASURY_THRESHOLD) {
-            uint256 excess = balance - TREASURY_THRESHOLD;
+        if (totalValue > TREASURY_THRESHOLD) {
+            uint256 excess = totalValue - TREASURY_THRESHOLD;
             
-            // Only buyback if excess is meaningful (> 50 USDC cents to avoid dust)
-            if (excess > 50) {
+            // Only buyback if excess > $1 USDC (1000000 = 1 USDC with 6 decimals)
+            if (excess > 1000000 && contractBalance >= excess) {
+                // Use contract balance for buyback (no vault withdrawal needed)
                 uint256 tokensBought = _swapUSDCForTokens(excess);
                 if (tokensBought > 0) {
                     // Burn the tokens
@@ -100,7 +165,7 @@ abstract contract ManagedTreasury is BaseConstants {
         token.mint(address(this), tokensToMint);
         emit TokensMinted(tokensToMint);
         
-        // Sell the tokens for USDC
+        // Sell the tokens for USDC (stays in contract)
         _swapTokensForUSDC(tokensToMint);
     }
     
@@ -149,10 +214,19 @@ abstract contract ManagedTreasury is BaseConstants {
     
     /**
      * @notice Add initial liquidity to Uniswap (owner only, one-time)
-     * @dev Creates the pair and adds liquidity with USDC
+     * @dev Creates the pair and adds liquidity with USDC from contract (or vault if needed)
      */
     function addLiquidity() public virtual onlyOwner {
         require(!liquidityAdded, "Liquidity already added");
+        
+        uint256 contractBalance = IERC20(USDC).balanceOf(address(this));
+        
+        // If contract doesn't have enough, withdraw from vault
+        if (contractBalance < LIQUIDITY_USDC_AMOUNT) {
+            uint256 needed = LIQUIDITY_USDC_AMOUNT - contractBalance;
+            _withdrawFromVault(needed);
+        }
+        
         require(IERC20(USDC).balanceOf(address(this)) >= LIQUIDITY_USDC_AMOUNT, "Insufficient USDC");
         
         // Mint tokens for liquidity to this contract
@@ -221,6 +295,14 @@ abstract contract ManagedTreasury is BaseConstants {
     function adminSwapUSDCForTokens(uint256 _usdcAmount) external onlyOwner returns (uint256 amountOut) {
         require(_usdcAmount > 0, "Must specify USDC amount");
         require(uniswapPair != address(0), "No liquidity pool");
+        
+        uint256 contractBalance = IERC20(USDC).balanceOf(address(this));
+        
+        // Withdraw from vault if needed
+        if (contractBalance < _usdcAmount) {
+            _withdrawFromVault(_usdcAmount - contractBalance);
+        }
+        
         require(IERC20(USDC).balanceOf(address(this)) >= _usdcAmount, "Insufficient USDC");
         
         return _swapUSDCForTokens(_usdcAmount);
@@ -228,7 +310,7 @@ abstract contract ManagedTreasury is BaseConstants {
     
     /**
      * @notice Admin function to test swapping tokens for USDC
-     * @dev Only owner can call. Mints tokens first, then swaps them for USDC
+     * @dev Only owner can call. Mints tokens first, then swaps them for USDC (stays in contract)
      * @param _tokenAmount Amount of tokens to mint and swap
      * @return amountOut Amount of USDC received
      */
@@ -239,7 +321,7 @@ abstract contract ManagedTreasury is BaseConstants {
         // Mint tokens to this contract first
         token.mint(address(this), _tokenAmount);
         
-        // Now swap them for USDC
+        // Swap them for USDC (stays in contract)
         return _swapTokensForUSDC(_tokenAmount);
     }
     

@@ -71,6 +71,9 @@ abstract contract SimpleTokenSale is BaseConstants {
             "USDC transfer failed"
         );
         
+        // Hook for handling received USDC (e.g., deposit to vault)
+        _onUSDCReceived(usdcAmount);
+        
         sellableToken.mint(msg.sender, _tokenAmount);
         
         emit TokensPurchased(msg.sender, _tokenAmount, usdcAmount);
@@ -84,6 +87,13 @@ abstract contract SimpleTokenSale is BaseConstants {
     }
     
     // ============ Hooks ============
+    
+    /**
+     * @dev Hook called when USDC is received
+     * @dev Override this in inheriting contracts to add custom logic (e.g., deposit to vault)
+     * @param amount Amount of USDC received
+     */
+    function _onUSDCReceived(uint256 amount) internal virtual {}
     
     /**
      * @dev Hook called when token sale completes (all tokens sold)

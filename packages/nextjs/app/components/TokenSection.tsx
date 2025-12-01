@@ -81,13 +81,24 @@ export const TokenSection = () => {
     functionName: "TREASURY_THRESHOLD",
   });
 
-  // Read USDC balance of the contract
-  const { data: treasuryBalance } = useScaffoldReadContract({
+  // Read USDC balance from vault
+  const { data: vaultBalance } = useScaffoldReadContract({
+    contractName: "Slot402",
+    functionName: "getVaultBalance",
+    watch: true,
+  });
+
+  // Read USDC balance in contract
+  const { data: contractUsdcBalance } = useScaffoldReadContract({
     contractName: "USDC",
     functionName: "balanceOf",
     args: [contractInfo?.address as `0x${string}`],
     watch: true,
   });
+
+  // Calculate total treasury balance (contract + vault)
+  const treasuryBalance =
+    vaultBalance !== undefined && contractUsdcBalance !== undefined ? vaultBalance + contractUsdcBalance : undefined;
 
   // Fetch token price from Uniswap pair
   useEffect(() => {
@@ -234,10 +245,24 @@ export const TokenSection = () => {
             <div className="font-semibold text-white mb-3">Treasury Status:</div>
 
             <div className="space-y-2">
-              {/* Current Balance Display */}
+              {/* Total Balance Display */}
               <div className="flex justify-between text-sm text-gray-300">
-                <span>Current Balance:</span>
-                <span className="font-bold text-white">${(Number(treasuryBalance) / 1e6).toFixed(4)} USDC</span>
+                <span>Total Balance:</span>
+                <span className="font-bold text-white">${(Number(treasuryBalance) / 1e6).toFixed(6)} USDC</span>
+              </div>
+
+              {/* Breakdown */}
+              <div className="flex justify-between text-xs text-gray-400 pl-4">
+                <span>├─ In Contract:</span>
+                <span className="font-mono">
+                  ${contractUsdcBalance ? (Number(contractUsdcBalance) / 1e6).toFixed(6) : "0.000000"} USDC
+                </span>
+              </div>
+              <div className="flex justify-between text-xs text-gray-400 pl-4 mb-2">
+                <span>└─ In Vault (earning yield):</span>
+                <span className="font-mono text-green-400">
+                  ${vaultBalance ? (Number(vaultBalance) / 1e6).toFixed(6) : "0.000000"} USDC
+                </span>
               </div>
 
               {/* Progress Bar */}
@@ -246,12 +271,19 @@ export const TokenSection = () => {
                 {(() => {
                   const thresholdValue = Number(treasuryThreshold) / 1e6; // USDC has 6 decimals
                   const balanceValue = Number(treasuryBalance) / 1e6; // USDC has 6 decimals
+                  const vaultValue = vaultBalance ? Number(vaultBalance) / 1e6 : 0;
+                  const buybackBuffer = 1.0; // $1 USDC buffer
+                  const buybackTrigger = thresholdValue + buybackBuffer; // $17.35
+
                   // Show range from 0 to ~1.11x threshold (so threshold is at 90%)
                   const maxDisplay = thresholdValue / 0.9;
                   const percentage = Math.min((balanceValue / maxDisplay) * 100, 100);
                   const thresholdPosition = 90; // Threshold is at 90% of the display
+                  const vaultPosition = Math.min((vaultValue / maxDisplay) * 100, 100);
+                  const buybackPosition = Math.min((buybackTrigger / maxDisplay) * 100, 100);
 
                   const isAboveThreshold = balanceValue >= thresholdValue;
+                  const isInBuybackMode = balanceValue >= buybackTrigger;
                   const barColor = isAboveThreshold ? "#10b981" : "#ef4444"; // green if above, red if below
 
                   return (
@@ -265,7 +297,19 @@ export const TokenSection = () => {
                         }}
                       />
 
-                      {/* Threshold marker line */}
+                      {/* Vault position marker (cyan line) */}
+                      {vaultValue > 0 && (
+                        <div
+                          className="absolute top-0 h-full w-1 bg-cyan-400 z-10"
+                          style={{
+                            left: `${vaultPosition}%`,
+                            boxShadow: "0 0 8px rgba(34, 211, 238, 0.6)",
+                          }}
+                          title={`Vault: $${vaultValue.toFixed(2)}`}
+                        />
+                      )}
+
+                      {/* Threshold marker line (yellow) */}
                       <div
                         className="absolute top-0 h-full w-1 bg-yellow-400 z-10"
                         style={{
@@ -274,10 +318,19 @@ export const TokenSection = () => {
                         }}
                       />
 
+                      {/* Buyback trigger marker (orange) */}
+                      <div
+                        className="absolute top-0 h-full w-1 bg-orange-500 z-10"
+                        style={{
+                          left: `${buybackPosition}%`,
+                          boxShadow: "0 0 8px rgba(249, 115, 22, 0.6)",
+                        }}
+                      />
+
                       {/* Labels */}
                       <div className="absolute inset-0 flex items-center justify-center">
                         <span className="text-xs font-bold text-white drop-shadow-lg z-20">
-                          {isAboveThreshold ? "🔥 BUYBACK MODE" : "⚠️ DEFICIT"}
+                          {isInBuybackMode ? "🔥 BUYBACK MODE" : isAboveThreshold ? "✅ HEALTHY" : "⚠️ DEFICIT"}
                         </span>
                       </div>
                     </>
@@ -286,12 +339,19 @@ export const TokenSection = () => {
               </div>
 
               {/* Legend */}
-              <div className="flex justify-between text-xs text-gray-400 mt-1">
-                <span>$0 USDC</span>
-                <span className="text-yellow-300 font-bold" style={{ marginLeft: "auto", marginRight: "10%" }}>
-                  ⭐ ${(Number(treasuryThreshold) / 1e6).toFixed(4)} USDC
+              <div className="flex flex-wrap gap-3 text-xs text-gray-400 mt-2 justify-center">
+                <span className="text-cyan-400">
+                  <span className="inline-block w-3 h-3 bg-cyan-400 rounded-sm mr-1"></span>
+                  Vault: ${vaultBalance ? (Number(vaultBalance) / 1e6).toFixed(2) : "0.00"}
                 </span>
-                <span>${(Number(treasuryThreshold) / 1e6 / 0.9).toFixed(4)} USDC</span>
+                <span className="text-yellow-300 font-bold">
+                  <span className="inline-block w-3 h-3 bg-yellow-400 rounded-sm mr-1"></span>⭐ Threshold: $
+                  {(Number(treasuryThreshold) / 1e6).toFixed(2)}
+                </span>
+                <span className="text-orange-400 font-bold">
+                  <span className="inline-block w-3 h-3 bg-orange-500 rounded-sm mr-1"></span>
+                  🔥 Buyback: ${(Number(treasuryThreshold) / 1e6 + 1).toFixed(2)}
+                </span>
               </div>
 
               {/* Status description */}
@@ -302,14 +362,16 @@ export const TokenSection = () => {
                   const hasLiquidity =
                     uniswapPairAddress && uniswapPairAddress !== "0x0000000000000000000000000000000000000000";
 
-                  if (balanceValue >= thresholdValue) {
+                  const buybackBuffer = 1.0; // $1 USDC buffer
+
+                  if (balanceValue >= thresholdValue + buybackBuffer) {
                     const excess = balanceValue - thresholdValue;
                     return (
                       <>
                         💰 <span className="text-green-300 font-bold">Surplus:</span> Treasury has{" "}
-                        <span className="text-green-300 font-bold">${excess.toFixed(4)} USDC</span> above threshold.
+                        <span className="text-green-300 font-bold">${excess.toFixed(6)} USDC</span> above threshold.
                         {hasLiquidity ? (
-                          <> Contract will buyback & burn tokens! 🔥</>
+                          <> Contract will buyback & burn ${buybackBuffer.toFixed(2)} USDC worth of tokens! 🔥</>
                         ) : (
                           <>
                             {" "}
@@ -318,6 +380,15 @@ export const TokenSection = () => {
                             </span>
                           </>
                         )}
+                      </>
+                    );
+                  } else if (balanceValue >= thresholdValue) {
+                    const excess = balanceValue - thresholdValue;
+                    return (
+                      <>
+                        ✅ <span className="text-green-300 font-bold">Healthy:</span> Treasury has{" "}
+                        <span className="text-green-300 font-bold">${excess.toFixed(6)} USDC</span> above threshold.{" "}
+                        (Need ${buybackBuffer.toFixed(2)} USDC more to trigger buyback)
                       </>
                     );
                   } else {
@@ -344,12 +415,10 @@ export const TokenSection = () => {
                 <div className="text-3xl">✅</div>
                 <div>
                   <div className="font-bold text-green-300 mb-1">
-                    Treasury Surplus ({">"} $
-                    {treasuryThreshold ? (Number(treasuryThreshold) / 1e6).toFixed(2) : "16.35"} USDC)
+                    Treasury Surplus ({">"} ${(Number(treasuryThreshold || 16350000) / 1e6 + 1).toFixed(2)} USDC)
                   </div>
                   <div className="text-sm text-gray-300">
-                    The contract automatically buys $S402 tokens from Uniswap and burns them, reducing supply and
-                    increasing scarcity.
+                    Contract buys $S402 from Uniswap and burns it, reducing supply.
                   </div>
                 </div>
               </div>
@@ -359,28 +428,28 @@ export const TokenSection = () => {
               <div className="flex items-start gap-3">
                 <div className="text-3xl">⚠️</div>
                 <div>
-                  <div className="font-bold text-yellow-300 mb-1">Treasury Deficit ({"<"} $0 USDC available)</div>
+                  <div className="font-bold text-yellow-300 mb-1">Treasury Deficit (Not enough for payouts)</div>
                   <div className="text-sm text-gray-300">
-                    The contract mints new $S402 tokens and sells them on Uniswap to raise USDC for covering player
-                    payouts.
+                    Contract mints $S402 and sells it on Uniswap to raise funds.
                   </div>
                 </div>
               </div>
             </div>
 
             <div className="text-sm text-gray-300 mt-4 p-3 rounded" style={{ backgroundColor: "#3a6b78" }}>
-              💡 This mechanism ensures the slot machine always has enough funds to pay winners while creating buying
-              pressure during profitable periods. The treasury threshold of{" "}
+              💡 <span className="font-bold">How It Works:</span> $15 USDC earns yield in the vault. The{" "}
               <span className="text-yellow-300 font-bold">
-                ${treasuryThreshold ? (Number(treasuryThreshold) / 1e6).toFixed(2) : "16.35"} USDC
+                ${treasuryThreshold ? (Number(treasuryThreshold) / 1e6).toFixed(2) : "16.35"} treasury threshold
               </span>{" "}
-              acts as a reserve buffer.
+              acts as a reserve. When total funds exceed ${(Number(treasuryThreshold || 16350000) / 1e6 + 1).toFixed(2)}{" "}
+              (${treasuryThreshold ? (Number(treasuryThreshold) / 1e6).toFixed(2) : "16.35"} + $1 buffer), the surplus
+              triggers buybacks.
             </div>
 
             <div className="text-sm text-gray-300 mt-3 p-3 rounded" style={{ backgroundColor: "#3a6b78" }}>
-              🎰 <span className="font-bold text-blue-300">Become the House:</span> By buying $S402 tokens, you become
-              part owner of the house. The slot machine has a slight house edge, and profits from this edge flow back to
-              token holders through the buyback and burn mechanism when the treasury is in surplus.
+              🎰 <span className="font-bold text-blue-300">Own the House:</span> Buy $S402 to become part owner. Earn
+              from the house edge profits AND vault yield on locked USDC. Both flow back through buyback & burn during
+              surplus periods.
             </div>
           </div>
         </div>

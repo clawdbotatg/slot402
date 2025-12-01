@@ -4,6 +4,8 @@ pragma solidity ^0.8.19;
 import "./DeployHelpers.s.sol";
 import "../contracts/Slot402.sol";
 import "../contracts/Slot402Token.sol";
+import "../contracts/VaultManager.sol";
+import "../contracts/BaseConstants.sol";
 
 /**
  * @notice Deploy script for Slot402 contract
@@ -26,13 +28,25 @@ contract DeploySlot402 is ScaffoldETHDeploy {
      *      - Export contract addresses & ABIs to `nextjs` packages
      */
     function run() external ScaffoldEthDeployerRunner {
+        // Get addresses from BaseConstants
+        address USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
+        address FLEET_COMMANDER = 0x98C49e13bf99D7CAd8069faa2A370933EC9EcF17;
+        
         // Deploy token first (deployer will be initial owner)
         Slot402Token token = new Slot402Token();
         console.log("Slot402Token deployed at:", address(token));
         
-        // Deploy slot machine with token address
-        Slot402 slot402 = new Slot402(address(token));
+        // Deploy VaultManager (without Slot402 address yet)
+        VaultManager vaultManager = new VaultManager(FLEET_COMMANDER, USDC);
+        console.log("VaultManager deployed at:", address(vaultManager));
+        
+        // Deploy Slot402 with token and vault manager addresses
+        Slot402 slot402 = new Slot402(address(token), payable(address(vaultManager)));
         console.log("Slot402 deployed at:", address(slot402));
+        
+        // Set Slot402 address in VaultManager (one-time)
+        vaultManager.setSlot402(address(slot402));
+        console.log("VaultManager configured with Slot402 address");
         
         // Transfer token ownership to Slot402 contract
         token.transferOwnership(address(slot402));
@@ -42,6 +56,7 @@ contract DeploySlot402 is ScaffoldETHDeploy {
         console.log("Current Phase:", uint256(slot402.currentPhase()));
         console.log("Token Price:", slot402.tokenPrice());
         console.log("Bet Size:", slot402.BET_SIZE());
+        console.log("Vault Balance:", slot402.getVaultBalance());
     }
 }
 

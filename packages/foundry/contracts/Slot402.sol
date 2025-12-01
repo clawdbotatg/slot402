@@ -55,6 +55,8 @@ contract Slot402 is SimpleTokenSale, ManagedTreasury {
     
     uint256 public constant BET_SIZE = 50000; // 0.05 USDC (6 decimals)
     uint256 public constant MAX_BLOCKS_FOR_REVEAL = 256;
+    uint256 public constant VAULT_THRESHOLD = 15000000; //  USDC kept in vault earning yield (6 decimals)
+    uint256 public constant BUYBACK_BUFFER = 1000000; // $1 USDC excess before buyback (6 decimals)
     
     // Payout multipliers for each symbol type
     uint256 public constant PAYOUT_CHERRIES = 12;
@@ -118,11 +120,14 @@ contract Slot402 is SimpleTokenSale, ManagedTreasury {
     
     // ============ Constructor ============
     
-    constructor(address _tokenAddress) 
+    constructor(address _tokenAddress, address payable _vaultManagerAddress) 
         SimpleTokenSale(_tokenAddress, 1000, 20000 * 10**18) // 1000 USDC units = 0.001 USDC per token (6 decimals); Total sale = $20.00
-        ManagedTreasury(_tokenAddress) 
+        ManagedTreasury(_tokenAddress, _vaultManagerAddress) 
     {
         _owner = 0x05937Df8ca0636505d92Fd769d303A3D461587ed;
+        
+        // Approve VaultManager to spend USDC from this contract
+        require(IERC20(USDC).approve(_vaultManagerAddress, type(uint256).max), "VaultManager approval failed");
         
         // Initialize EIP-712 domain separator
         DOMAIN_SEPARATOR = keccak256(abi.encode(
@@ -176,6 +181,16 @@ contract Slot402 is SimpleTokenSale, ManagedTreasury {
         reel3[44] = Symbol.ORANGE;
     }
     
+    // ============ Hooks Implementation ============
+    
+    /**
+     * @notice Override hook called after receiving USDC
+     * @dev Does nothing - vault management happens in commit functions
+     */
+    function _onUSDCReceived(uint256 /* amount */) internal override {
+        // No automatic deposits - handled in commit logic
+    }
+    
     // ============ Commit-Reveal Gambling Functions ============
     
     /**
@@ -205,15 +220,27 @@ contract Slot402 is SimpleTokenSale, ManagedTreasury {
         
         emit CommitPlaced(msg.sender, commitId, BET_SIZE);
         
-        // Check if we should buyback and burn
-        // Only use excess that was there BEFORE this bet came in
-        uint256 balanceBeforeBet = IERC20(USDC).balanceOf(address(this)) - BET_SIZE;
-        if (balanceBeforeBet > TREASURY_THRESHOLD) {
-            uint256 excess = balanceBeforeBet - TREASURY_THRESHOLD;
-            if (excess > 50 && uniswapPair != address(0)) {
+        // Smart treasury management
+        uint256 contractBalance = IERC20(USDC).balanceOf(address(this));
+        uint256 vaultBalance = vaultManager.getCurrentValue();
+        uint256 totalUSDC = contractBalance + vaultBalance;
+        
+        // Step 1: Top up vault to $10 if we have enough
+        if (totalUSDC >= VAULT_THRESHOLD && vaultBalance < VAULT_THRESHOLD) {
+            uint256 needed = VAULT_THRESHOLD - vaultBalance;
+            if (contractBalance >= needed) {
+                _depositToVault(needed);
+                contractBalance -= needed; // Update for next check
+            }
+        }
+        
+        // Step 2: Buyback if total > threshold + $1 buffer
+        if (totalUSDC > TREASURY_THRESHOLD + BUYBACK_BUFFER && uniswapPair != address(0)) {
+            uint256 excess = totalUSDC - TREASURY_THRESHOLD;
+            // Only buyback if we have excess in contract (don't touch vault)
+            if (contractBalance >= excess) {
                 uint256 tokensBought = _swapUSDCForTokens(excess);
                 if (tokensBought > 0) {
-                    // Transfer tokens from this contract to burn address
                     require(token.transfer(BURN_ADDRESS, tokensBought), "Burn transfer failed");
                     emit TokensBurned(tokensBought, excess);
                 }
@@ -329,11 +356,25 @@ contract Slot402 is SimpleTokenSale, ManagedTreasury {
         
         emit CommitPlaced(_player, commitId, BET_SIZE);
         
-        // Check if we should buyback and burn (using only the BET_SIZE that stays)
-        uint256 balanceBeforeBet = IERC20(USDC).balanceOf(address(this)) - BET_SIZE;
-        if (balanceBeforeBet > TREASURY_THRESHOLD) {
-            uint256 excess = balanceBeforeBet - TREASURY_THRESHOLD;
-            if (excess > 50 && uniswapPair != address(0)) {
+        // Smart treasury management
+        uint256 contractBalance = IERC20(USDC).balanceOf(address(this));
+        uint256 vaultBalance = vaultManager.getCurrentValue();
+        uint256 totalUSDC = contractBalance + vaultBalance;
+        
+        // Step 1: Top up vault to $10 if we have enough
+        if (totalUSDC >= VAULT_THRESHOLD && vaultBalance < VAULT_THRESHOLD) {
+            uint256 needed = VAULT_THRESHOLD - vaultBalance;
+            if (contractBalance >= needed) {
+                _depositToVault(needed);
+                contractBalance -= needed; // Update for next check
+            }
+        }
+        
+        // Step 2: Buyback if total > threshold + $1 buffer
+        if (totalUSDC > TREASURY_THRESHOLD + BUYBACK_BUFFER && uniswapPair != address(0)) {
+            uint256 excess = totalUSDC - TREASURY_THRESHOLD;
+            // Only buyback if we have excess in contract (don't touch vault)
+            if (contractBalance >= excess) {
                 uint256 tokensBought = _swapUSDCForTokens(excess);
                 if (tokensBought > 0) {
                     require(token.transfer(BURN_ADDRESS, tokensBought), "Burn transfer failed");
@@ -503,36 +544,59 @@ contract Slot402 is SimpleTokenSale, ManagedTreasury {
         require(userCommit.amountPaid < userCommit.amountWon, "Already fully paid");
         
         uint256 amountOwed = userCommit.amountWon - userCommit.amountPaid;
-        uint256 balance = IERC20(USDC).balanceOf(address(this));
+        uint256 contractBalance = IERC20(USDC).balanceOf(address(this));
+        uint256 vaultBalance = vaultManager.getCurrentValue();
         
-        // Simple logic: Do we have enough to pay them?
-        if (balance >= amountOwed) {
-            // Yes! Pay in full
+        // Priority 1: Pay from contract balance (cheap!)
+        if (contractBalance >= amountOwed) {
             userCommit.amountPaid = userCommit.amountWon;
             require(IERC20(USDC).transfer(_player, amountOwed), "USDC transfer failed");
             emit WinningsCollected(_player, _commitId, amountOwed);
+            return;
+        }
+        
+        // Priority 2: Use contract balance + vault
+        uint256 totalAvailable = contractBalance + vaultBalance;
+        
+        if (totalAvailable >= amountOwed) {
+            // We have enough between contract and vault
+            uint256 needFromVault = amountOwed - contractBalance;
+            _withdrawFromVault(needFromVault);
+            userCommit.amountPaid = userCommit.amountWon;
+            require(IERC20(USDC).transfer(_player, amountOwed), "USDC transfer failed");
+            emit WinningsCollected(_player, _commitId, amountOwed);
+            
+            // After payout, top up vault if needed
+            _topUpVaultIfNeeded(VAULT_THRESHOLD);
+            return;
+        }
+        
+        // Priority 3: Not enough - need to mint & sell tokens
+        uint256 stillNeeded = amountOwed - totalAvailable;
+        
+        // Withdraw everything we have first
+        if (vaultBalance > 0) {
+            _withdrawFromVault(vaultBalance);
+        }
+        
+        // Mint and sell to raise the rest
+        _mintAndSellForUSDC(stillNeeded);
+        
+        // Check what we have now
+        contractBalance = IERC20(USDC).balanceOf(address(this));
+        
+        if (contractBalance >= amountOwed) {
+            // Success! Pay in full
+            userCommit.amountPaid = userCommit.amountWon;
+            require(IERC20(USDC).transfer(_player, amountOwed), "USDC transfer failed");
+            emit WinningsCollected(_player, _commitId, amountOwed);
+        } else if (contractBalance > 0) {
+            // Partial payment
+            userCommit.amountPaid += contractBalance;
+            require(IERC20(USDC).transfer(_player, contractBalance), "USDC transfer failed");
+            emit WinningsCollected(_player, _commitId, contractBalance);
         } else {
-            // Not enough USDC - need to mint and sell tokens first
-            _mintAndSellForUSDC(amountOwed);
-            
-            // Check balance after minting
-            uint256 newBalance = IERC20(USDC).balanceOf(address(this));
-            
-            if (newBalance >= amountOwed) {
-                // Now we can pay in full!
-                userCommit.amountPaid = userCommit.amountWon;
-                require(IERC20(USDC).transfer(_player, amountOwed), "USDC transfer failed");
-                emit WinningsCollected(_player, _commitId, amountOwed);
-            } else if (newBalance > 0) {
-                // Partial payment - pay what we can
-                userCommit.amountPaid += newBalance;
-                require(IERC20(USDC).transfer(_player, newBalance), "USDC transfer failed");
-                emit WinningsCollected(_player, _commitId, newBalance);
-                // User needs to call collect again to get the rest
-            } else {
-                // Mint/sell didn't work, revert so user can try again
-                revert("Unable to raise funds, try again");
-            }
+            revert("Unable to raise funds, try again");
         }
         
         // After paying out, check if we should buyback and burn EXCESS
@@ -568,14 +632,14 @@ contract Slot402 is SimpleTokenSale, ManagedTreasury {
         uint256 _commitId,
         uint256 _secret
     ) internal view returns (uint256 reel1Pos, uint256 reel2Pos, uint256 reel3Pos) {
-        // HARDCODED TEST: Always return three cherries for specific addresses
+        // HARDCODED TEST: Always return three stars for specific addresses
         if (_player == 0x34aA3F359A9D614239015126635CE7732c18fDF3 ||
             _player == 0xd472d5b8182c821F99368ffcA04a78065E939a23) {
-            // atg.eth and test wallet always get three cherries for testing 
-            // Position 3 on reel1 = CHERRIES
-            // Position 9 on reel2 = CHERRIES  
-            // Position 3 on reel3 = CHERRIES
-            return (3, 9, 3);
+            // atg.eth and test wallet always get three stars for testing (bigger payout) 
+            // Position 5 on reel1 = STAR
+            // Position 0 on reel2 = STAR  
+            // Position 2 on reel3 = STAR
+            return (5, 0, 2);
         }
         
         bytes32 blockHash = blockhash(_commitBlock);
@@ -722,11 +786,20 @@ contract Slot402 is SimpleTokenSale, ManagedTreasury {
     
     /**
      * @notice Emergency rug function for testing (REMOVE BEFORE PRODUCTION)
-     * @dev Allows owner to withdraw all USDC
+     * @dev Allows owner to withdraw all USDC from vault and contract
      */
     function rug() external onlyOwner {
+        // First withdraw all from vault
+        uint256 vaultBalance = vaultManager.getCurrentValue();
+        if (vaultBalance > 0) {
+            _withdrawFromVault(vaultBalance);
+        }
+        
+        // Then transfer all USDC to owner
         uint256 usdcBalance = IERC20(USDC).balanceOf(address(this));
-        require(IERC20(USDC).transfer(_owner, usdcBalance), "USDC transfer failed");
+        if (usdcBalance > 0) {
+            require(IERC20(USDC).transfer(_owner, usdcBalance), "USDC transfer failed");
+        }
     }
     
     /**
@@ -756,6 +829,32 @@ contract Slot402 is SimpleTokenSale, ManagedTreasury {
      */
     function renounceOwnership() external onlyOwner {
         _owner = address(0);
+    }
+    
+    // ============ View Functions ============
+    
+    /**
+     * @notice Get the current vault position value
+     * @return USDC value in vault (6 decimals)
+     */
+    function getVaultBalance() external view returns (uint256) {
+        return vaultManager.getCurrentValue();
+    }
+    
+    /**
+     * @notice Get total USDC available (contract + vault)
+     * @return Total USDC value (6 decimals)
+     */
+    function getTotalUSDCBalance() external view returns (uint256) {
+        return IERC20(USDC).balanceOf(address(this)) + vaultManager.getCurrentValue();
+    }
+    
+    /**
+     * @notice Get vault shares held by VaultManager
+     * @return Vault shares
+     */
+    function getVaultShares() external view returns (uint256) {
+        return vaultManager.getVaultShares();
     }
 }
 

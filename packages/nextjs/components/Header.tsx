@@ -4,7 +4,6 @@ import React from "react";
 import Link from "next/link";
 import { hardhat } from "viem/chains";
 import { FaucetButton, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
-import deployedContracts from "~~/contracts/deployedContracts";
 import { useScaffoldReadContract, useTargetNetwork } from "~~/hooks/scaffold-eth";
 
 /**
@@ -21,15 +20,10 @@ export const Header = () => {
 
   const phaseEmoji = currentPhase === 0 ? "🛒" : currentPhase === 1 ? "🎰" : "⚙️";
 
-  // Get contract address
-  const chainId = targetNetwork.id as keyof typeof deployedContracts;
-  const contractAddress = (deployedContracts as any)[chainId]?.Slot402?.address;
-
-  // Watch contract USDC balance
-  const { data: contractUsdcBalance } = useScaffoldReadContract({
-    contractName: "USDC",
-    functionName: "balanceOf",
-    args: [contractAddress as `0x${string}`],
+  // Watch total USDC balance (contract + vault)
+  const { data: totalBalance } = useScaffoldReadContract({
+    contractName: "Slot402",
+    functionName: "getTotalUSDCBalance",
     watch: true,
   });
 
@@ -47,11 +41,7 @@ export const Header = () => {
           </div>
         </Link>
         <div className="text-lg font-semibold">
-          {contractUsdcBalance !== undefined ? (
-            <>${(Number(contractUsdcBalance) / 1e6).toFixed(2)} USDC</>
-          ) : (
-            <>$0.00 USDC</>
-          )}
+          {totalBalance !== undefined ? <>${(Number(totalBalance) / 1e6).toFixed(6)} USDC</> : <>$0.000000 USDC</>}
         </div>
       </div>
       <div className="navbar-end grow mr-4">

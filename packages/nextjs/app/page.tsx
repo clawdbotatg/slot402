@@ -334,10 +334,10 @@ export default function Home() {
 
       console.log("⏳ Waiting for user to sign transaction...");
 
-      // Wait for user to sign transaction - this will throw if rejected or fails
       const txHash = await writeCommit({
         functionName: "commit",
         args: [commitHash as `0x${string}`],
+        gas: 2500000n,
       });
 
       // Only reach here if transaction was successfully signed
