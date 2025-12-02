@@ -106,6 +106,7 @@ const RUGSLOT_ABI = [
   "function commitWithMetaTransaction(address _player, bytes32 _commitHash, uint256 _nonce, uint256 _deadline, bytes _signature, address _facilitatorAddress, tuple(address from, address to, uint256 value, uint256 validAfter, uint256 validBefore, bytes32 nonce) _usdcAuth, bytes _usdcSignature) external returns (uint256)",
   "function commitCount(address) external view returns (uint256)",
   "function revealAndCollectFor(address _player, uint256 _commitId, uint256 _secret) external",
+  "function commits(address, uint256) external view returns (bytes32 commitHash, uint256 commitBlock, uint256 amountWon, uint256 amountPaid, bool revealed)",
 ];
 
 // Uniswap V2 Router ABI (for swapping USDC to ETH)
@@ -659,9 +660,26 @@ app.post("/claim", async (req, res) => {
             gasUsed: receipt.gasUsed.toString(),
           });
 
+          // Check if payment is complete
+          const commitData = await rugSlotContract.commits(
+            player,
+            BigInt(commitId)
+          );
+          const [, , amountWon, amountPaid] = commitData;
+
+          console.log(`   Amount won: ${amountWon.toString()}`);
+          console.log(`   Amount paid: ${amountPaid.toString()}`);
+
+          if (amountPaid >= amountWon) {
+            console.log(`✅ All winnings fully paid!`);
+            break;
+          }
+
           // Wait 1 second before next attempt (to allow mint/sell to process)
           if (attempt < maxAttempts) {
-            console.log(`⏸️  Waiting 1 second before next attempt...`);
+            console.log(
+              `⏸️  More to claim - waiting 1 second before next attempt...`
+            );
             await new Promise((resolve) => setTimeout(resolve, 1000));
           }
         } else {
