@@ -1112,8 +1112,139 @@ export default function Home() {
 
               {/* Client Code Example */}
               <div className="rounded-lg overflow-hidden">
-                <div className="bg-[#1e1e1e] px-6 py-3 border-b border-gray-700">
+                <div className="bg-[#1e1e1e] px-6 py-3 border-b border-gray-700 flex justify-between items-center">
                   <h3 className="text-lg font-bold text-white">💻 Client Code Example</h3>
+                  <button
+                    className="btn btn-sm btn-ghost text-white hover:bg-gray-700"
+                    onClick={() => {
+                      const code = `// ═══════════════════════════════════════════════════════════════════════════════
+// SLOT402 CLIENT - Complete copy/paste example for ethers v6
+// Create .env file with PRIVATE_KEY=0x... then run: node slot402.js
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import "dotenv/config";
+import { ethers } from "ethers";
+
+const CHAIN_ID = 8453;
+const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+const API_URL = "https://api.slot402.com:8000";
+
+if (!process.env.PRIVATE_KEY) throw new Error("PRIVATE_KEY not set in .env");
+const provider = new ethers.JsonRpcProvider("https://mainnet.base.org");
+const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 1: Request roll → Server returns 402 with payment details
+// ─────────────────────────────────────────────────────────────────────────────
+const rollResponse = await fetch(\`\${API_URL}/roll\`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ player: wallet.address })
+});
+if (rollResponse.status !== 402) throw new Error("Expected 402");
+const payment = await rollResponse.json();
+console.log(\`💳 Bet: \${ethers.formatUnits(payment.pricing.betSize, 6)} USDC + \${ethers.formatUnits(payment.pricing.facilitatorFee, 6)} fee\`);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 2: Create contract instance using address from 402 response
+// ─────────────────────────────────────────────────────────────────────────────
+const SLOT402 = payment.accepts[0].payTo;  // ← Contract address is here!
+const contract = new ethers.Contract(SLOT402, [
+  "function getCommitHash(uint256 secret) view returns (bytes32)",
+  "function nonces(address) view returns (uint256)"
+], provider);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 3: Generate secret and fetch commit data
+// ─────────────────────────────────────────────────────────────────────────────
+const secret = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString();
+const [commitHash, nonce] = await Promise.all([
+  contract.getCommitHash(BigInt(secret)),
+  contract.nonces(wallet.address)
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 4: Sign MetaCommit (EIP-712) and USDC payment (EIP-3009)
+// ─────────────────────────────────────────────────────────────────────────────
+const deadline = Math.floor(Date.now() / 1000) + 300;
+
+const [metaCommitSig, paymentPayload] = await Promise.all([
+  // MetaCommit signature (EIP-712)
+  wallet.signTypedData(
+    { name: "Slot402", version: "1", chainId: BigInt(CHAIN_ID), verifyingContract: SLOT402 },
+    { MetaCommit: [
+      { name: "player", type: "address" },
+      { name: "commitHash", type: "bytes32" },
+      { name: "nonce", type: "uint256" },
+      { name: "deadline", type: "uint256" }
+    ]},
+    { player: wallet.address, commitHash, nonce, deadline: BigInt(deadline) }
+  ),
+  // USDC payment signature (EIP-3009 transferWithAuthorization)
+  (async () => {
+    const pm = payment.accepts[0];
+    const auth = {
+      from: wallet.address,
+      to: pm.payTo,
+      value: pm.maxAmountRequired,
+      validAfter: 0,
+      validBefore: Math.floor(Date.now() / 1000) + (pm.maxTimeoutSeconds || 600),
+      nonce: ethers.hexlify(ethers.randomBytes(32))
+    };
+    const signature = await wallet.signTypedData(
+      {
+        name: pm.extra?.name || "USD Coin",
+        version: pm.extra?.version || "2",
+        chainId: BigInt(pm.extra?.chainId || CHAIN_ID),
+        verifyingContract: pm.asset || USDC_ADDRESS
+      },
+      { TransferWithAuthorization: [
+        { name: "from", type: "address" },
+        { name: "to", type: "address" },
+        { name: "value", type: "uint256" },
+        { name: "validAfter", type: "uint256" },
+        { name: "validBefore", type: "uint256" },
+        { name: "nonce", type: "bytes32" }
+      ]},
+      { ...auth, value: BigInt(auth.value), validAfter: BigInt(auth.validAfter), validBefore: BigInt(auth.validBefore) }
+    );
+    return { payload: { authorization: auth, signature }, network: pm.network, scheme: pm.scheme };
+  })()
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 5: Submit to server and display result
+// ─────────────────────────────────────────────────────────────────────────────
+const submitRes = await fetch(\`\${API_URL}/roll/submit\`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    requestId: payment.requestId,
+    paymentPayload,
+    metaCommit: { player: wallet.address, commitHash, nonce: nonce.toString(), deadline, signature: metaCommitSig },
+    secret
+  })
+});
+if (!submitRes.ok) throw new Error("Submit failed: " + submitRes.status);
+
+const result = await submitRes.json();
+const [s1, s2, s3] = result.roll.symbols;
+console.log(\`🎰 [ \${s1} ] [ \${s2} ] [ \${s3} ]\`);
+if (result.roll.won) {
+  console.log(\`🏆 WON \${ethers.formatUnits(result.roll.payout, 6)} USDC!\`);
+  console.log(\`✅ https://basescan.org/tx/\${result.roll.claimTransaction}\`);
+}`;
+                      navigator.clipboard.writeText(code);
+                      const btn = document.activeElement as HTMLButtonElement;
+                      const originalText = btn.textContent;
+                      btn.textContent = "Copied!";
+                      setTimeout(() => {
+                        btn.textContent = originalText;
+                      }, 2000);
+                    }}
+                  >
+                    📋 Copy
+                  </button>
                 </div>
                 {/* @ts-ignore - Type incompatibility with React 19 */}
                 <SyntaxHighlighter
@@ -1133,84 +1264,118 @@ export default function Home() {
                     userSelect: "none",
                   }}
                 >
-                  {`// Setup: wallet (ethers Wallet/Signer), contract (Slot402 contract instance)
-// CHAIN_ID = 8453 (Base), SLOT402 = contract address
+                  {`// ═══════════════════════════════════════════════════════════════════════════════
+// SLOT402 CLIENT - Complete copy/paste example for ethers v6
+// Create .env file with PRIVATE_KEY=0x... then run: node slot402.js
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// Request roll from server (returns 402)
-const rollResponse = await fetch("https://api.slot402.com:8000/roll", {
+import "dotenv/config";
+import { ethers } from "ethers";
+
+const CHAIN_ID = 8453;
+const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+const API_URL = "https://api.slot402.com:8000";
+
+if (!process.env.PRIVATE_KEY) throw new Error("PRIVATE_KEY not set in .env");
+const provider = new ethers.JsonRpcProvider("https://mainnet.base.org");
+const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 1: Request roll → Server returns 402 with payment details
+// ─────────────────────────────────────────────────────────────────────────────
+const rollResponse = await fetch(\`\${API_URL}/roll\`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ player: wallet.address })
 });
-
-if (rollResponse.status !== 402) {
-  throw new Error("Unexpected response: " + rollResponse.status);
-}
-
+if (rollResponse.status !== 402) throw new Error("Expected 402");
 const payment = await rollResponse.json();
-console.log(\`💳 \${payment.pricing.betSize} + \${payment.pricing.facilitatorFee} fee\`);
+console.log(\`💳 Bet: \${ethers.formatUnits(payment.pricing.betSize, 6)} USDC + \${ethers.formatUnits(payment.pricing.facilitatorFee, 6)} fee\`);
 
-// Generate secret and get commit data in parallel
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 2: Create contract instance using address from 402 response
+// ─────────────────────────────────────────────────────────────────────────────
+const SLOT402 = payment.accepts[0].payTo;  // ← Contract address is here!
+const contract = new ethers.Contract(SLOT402, [
+  "function getCommitHash(uint256 secret) view returns (bytes32)",
+  "function nonces(address) view returns (uint256)"
+], provider);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 3: Generate secret and fetch commit data
+// ─────────────────────────────────────────────────────────────────────────────
 const secret = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString();
 const [commitHash, nonce] = await Promise.all([
   contract.getCommitHash(BigInt(secret)),
   contract.nonces(wallet.address)
 ]);
 
-// Sign MetaCommit (EIP-712) and payment (EIP-3009) in parallel
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 4: Sign MetaCommit (EIP-712) and USDC payment (EIP-3009)
+// ─────────────────────────────────────────────────────────────────────────────
 const deadline = Math.floor(Date.now() / 1000) + 300;
+
 const [metaCommitSig, paymentPayload] = await Promise.all([
-  wallet.signTypedData({
-    domain: {
-      name: "Slot402",
-      version: "1",
-      chainId: BigInt(CHAIN_ID),
-      verifyingContract: SLOT402
-    },
-    types: {
-      MetaCommit: [
-        { name: "player", type: "address" },
-        { name: "commitHash", type: "bytes32" },
-        { name: "nonce", type: "uint256" },
-        { name: "deadline", type: "uint256" }
-      ]
-    },
-    primaryType: "MetaCommit",
-    message: {
-      player: wallet.address,
-      commitHash,
-      nonce,
-      deadline: BigInt(deadline)
-    }
-  }),
-  processPayment(payment.accepts[0], wallet)
+  // MetaCommit signature (EIP-712)
+  wallet.signTypedData(
+    { name: "Slot402", version: "1", chainId: BigInt(CHAIN_ID), verifyingContract: SLOT402 },
+    { MetaCommit: [
+      { name: "player", type: "address" },
+      { name: "commitHash", type: "bytes32" },
+      { name: "nonce", type: "uint256" },
+      { name: "deadline", type: "uint256" }
+    ]},
+    { player: wallet.address, commitHash, nonce, deadline: BigInt(deadline) }
+  ),
+  // USDC payment signature (EIP-3009 transferWithAuthorization)
+  (async () => {
+    const pm = payment.accepts[0];
+    const auth = {
+      from: wallet.address,
+      to: pm.payTo,
+      value: pm.maxAmountRequired,
+      validAfter: 0,
+      validBefore: Math.floor(Date.now() / 1000) + (pm.maxTimeoutSeconds || 600),
+      nonce: ethers.hexlify(ethers.randomBytes(32))
+    };
+    const signature = await wallet.signTypedData(
+      {
+        name: pm.extra?.name || "USD Coin",
+        version: pm.extra?.version || "2",
+        chainId: BigInt(pm.extra?.chainId || CHAIN_ID),
+        verifyingContract: pm.asset || USDC_ADDRESS
+      },
+      { TransferWithAuthorization: [
+        { name: "from", type: "address" },
+        { name: "to", type: "address" },
+        { name: "value", type: "uint256" },
+        { name: "validAfter", type: "uint256" },
+        { name: "validBefore", type: "uint256" },
+        { name: "nonce", type: "bytes32" }
+      ]},
+      { ...auth, value: BigInt(auth.value), validAfter: BigInt(auth.validAfter), validBefore: BigInt(auth.validBefore) }
+    );
+    return { payload: { authorization: auth, signature }, network: pm.network, scheme: pm.scheme };
+  })()
 ]);
 
-// Submit and get result
-const submitRes = await fetch("https://api.slot402.com:8000/roll/submit", {
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 5: Submit to server and display result
+// ─────────────────────────────────────────────────────────────────────────────
+const submitRes = await fetch(\`\${API_URL}/roll/submit\`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
     requestId: payment.requestId,
     paymentPayload,
-    metaCommit: {
-      player: wallet.address,
-      commitHash,
-      nonce: nonce.toString(),
-      deadline,
-      signature: metaCommitSig
-    },
+    metaCommit: { player: wallet.address, commitHash, nonce: nonce.toString(), deadline, signature: metaCommitSig },
     secret
   })
 });
-
-if (!submitRes.ok) {
-  throw new Error("Submit failed: " + submitRes.status);
-}
+if (!submitRes.ok) throw new Error("Submit failed: " + submitRes.status);
 
 const result = await submitRes.json();
 const [s1, s2, s3] = result.roll.symbols;
-
 console.log(\`🎰 [ \${s1} ] [ \${s2} ] [ \${s3} ]\`);
 if (result.roll.won) {
   console.log(\`🏆 WON \${ethers.formatUnits(result.roll.payout, 6)} USDC!\`);
