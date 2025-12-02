@@ -520,7 +520,7 @@ app.post("/settle", async (req, res) => {
       usdcAuth,
       usdcSignature,
       {
-        gasLimit: 3000000, // High limit to handle vault/DeFi interactions (can use up to 2.5M gas)
+        gasLimit: 5000000, // High limit to handle vault/DeFi interactions (can use up to 3M gas)
       }
     );
 
@@ -637,7 +637,7 @@ app.post("/claim", async (req, res) => {
           BigInt(commitId),
           BigInt(secret),
           {
-            gasLimit: 3000000, // High limit to handle vault withdrawals and mint/sell operations
+            gasLimit: 5000000, // High limit to handle vault withdrawals and mint/sell operations
           }
         );
 
