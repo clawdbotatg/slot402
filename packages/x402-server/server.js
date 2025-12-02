@@ -525,9 +525,10 @@ app.post("/roll/submit", async (req, res) => {
         );
 
         if (claimResponse.success) {
+          const claimTxHash = claimResponse.transactions?.[0]?.hash;
           console.log(`✅ Winnings claimed and sent to player!`);
-          console.log(`   Claim TX: ${claimResponse.transaction}`);
-          claimTransaction = claimResponse.transaction;
+          console.log(`   Claim TX: ${claimTxHash}`);
+          claimTransaction = claimTxHash;
         } else {
           console.warn(
             `⚠️  Could not auto-claim: ${claimResponse.errorReason}`

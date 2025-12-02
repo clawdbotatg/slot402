@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { OwnerControls } from "./components/OwnerControls";
 import { PayoutTable } from "./components/PayoutTable";
@@ -53,6 +53,7 @@ export default function Home() {
   const [isX402Rolling, setIsX402Rolling] = useState(false);
   const [x402Error, setX402Error] = useState<string | null>(null);
   const [x402Won, setX402Won] = useState(false);
+  const isX402RollingRef = useRef(false); // Ref-based guard to prevent rapid double-clicks
 
   // Map Symbol enum to image paths
   const symbolToImage = (symbolIndex: number): string => {
@@ -518,7 +519,15 @@ export default function Home() {
   };
 
   const handleX402Roll = async () => {
+    // Guard against rapid double-clicks (ref check is synchronous, unlike state)
+    if (isX402RollingRef.current) {
+      console.log("⏳ Roll already in progress, ignoring duplicate click");
+      return;
+    }
+    isX402RollingRef.current = true;
+
     if (!connectedAddress) {
+      isX402RollingRef.current = false;
       openConnectModal?.();
       return;
     }
@@ -728,6 +737,7 @@ export default function Home() {
       setReelsAnimating(false);
     } finally {
       setIsX402Rolling(false);
+      isX402RollingRef.current = false; // Reset ref-based guard
     }
   };
 

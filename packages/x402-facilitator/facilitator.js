@@ -390,6 +390,34 @@ async function checkAndRefillETH() {
   }
 }
 
+// Throttle state for ETH refill check
+let lastETHCheckTime = 0;
+let ethCheckInProgress = false;
+const ETH_CHECK_INTERVAL = 5000; // Only check every 5 seconds
+
+/**
+ * Throttled version of checkAndRefillETH to prevent race conditions
+ * with concurrent requests. Runs non-blocking (fire and forget).
+ */
+function checkAndRefillETHThrottled() {
+  const now = Date.now();
+  
+  // Skip if checked recently or check is already in progress
+  if (now - lastETHCheckTime < ETH_CHECK_INTERVAL || ethCheckInProgress) {
+    return;
+  }
+  
+  lastETHCheckTime = now;
+  ethCheckInProgress = true;
+  
+  // Fire and forget - don't await
+  checkAndRefillETH()
+    .catch(err => console.error("ETH refill error:", err.message))
+    .finally(() => {
+      ethCheckInProgress = false;
+    });
+}
+
 /**
  * POST /verify
  * Verify EIP-712 signature for EIP-3009 authorization
@@ -554,8 +582,8 @@ app.post("/verify", async (req, res) => {
  */
 app.post("/settle", async (req, res) => {
   try {
-    // Check and refill ETH if needed before processing
-    await checkAndRefillETH();
+    // Check and refill ETH if needed (throttled, non-blocking)
+    checkAndRefillETHThrottled();
 
     const { payload, requirements, metaCommit } = req.body;
 
@@ -740,8 +768,8 @@ app.post("/settle", async (req, res) => {
  */
 app.post("/claim", async (req, res) => {
   try {
-    // Check and refill ETH if needed before processing
-    await checkAndRefillETH();
+    // Check and refill ETH if needed (throttled, non-blocking)
+    checkAndRefillETHThrottled();
 
     const { player, commitId, secret } = req.body;
 
