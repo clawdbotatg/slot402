@@ -131,11 +131,7 @@ async function checkBalance() {
 
     // Check USDC balance
     const ERC20_ABI = ["function balanceOf(address) view returns (uint256)"];
-    const usdcContract = new ethers.Contract(
-      USDC_ADDRESS,
-      ERC20_ABI,
-      provider
-    );
+    const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, provider);
     const usdcBalance = await usdcContract.balanceOf(wallet.address);
     const usdcBalanceFormatted = ethers.formatUnits(usdcBalance, 6);
 
@@ -176,7 +172,7 @@ async function checkAndRefillETH() {
   try {
     // Check current ETH balance
     const ethBalance = await provider.getBalance(wallet.address);
-    
+
     if (ethBalance >= ETH_REFILL_THRESHOLD) {
       // ETH balance is fine, no need to refill
       return;
@@ -190,23 +186,26 @@ async function checkAndRefillETH() {
       "function balanceOf(address) view returns (uint256)",
       "function approve(address spender, uint256 amount) external returns (bool)",
     ];
-    const usdcContract = new ethers.Contract(
-      USDC_ADDRESS,
-      ERC20_ABI,
-      wallet
-    );
+    const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, wallet);
     const usdcBalance = await usdcContract.balanceOf(wallet.address);
 
     if (usdcBalance === 0n) {
-      console.warn(`⚠️  No USDC to swap for ETH! Facilitator needs manual ETH refill.`);
+      console.warn(
+        `⚠️  No USDC to swap for ETH! Facilitator needs manual ETH refill.`
+      );
       return;
     }
 
-    console.log(`💵 Swapping ${ethers.formatUnits(usdcBalance, 6)} USDC to ETH...`);
+    console.log(
+      `💵 Swapping ${ethers.formatUnits(usdcBalance, 6)} USDC to ETH...`
+    );
 
     // Approve Uniswap router to spend USDC
     console.log(`   Approving Uniswap router...`);
-    const approveTx = await usdcContract.approve(UNISWAP_V2_ROUTER, usdcBalance);
+    const approveTx = await usdcContract.approve(
+      UNISWAP_V2_ROUTER,
+      usdcBalance
+    );
     await approveTx.wait();
     console.log(`   ✅ Approval confirmed`);
 
@@ -219,10 +218,12 @@ async function checkAndRefillETH() {
       UNISWAP_V2_ROUTER_ABI,
       wallet
     );
-    
+
     const amountsOut = await routerContract.getAmountsOut(usdcBalance, path);
     const expectedETH = amountsOut[1];
-    console.log(`   Expected to receive: ${ethers.formatEther(expectedETH)} ETH`);
+    console.log(
+      `   Expected to receive: ${ethers.formatEther(expectedETH)} ETH`
+    );
 
     // Execute swap with 5% slippage tolerance
     const minAmountOut = (expectedETH * 95n) / 100n;
@@ -247,7 +248,9 @@ async function checkAndRefillETH() {
       const newEthBalance = await provider.getBalance(wallet.address);
       console.log(`✅ Swap successful!`);
       console.log(`   Transaction: ${swapTx.hash}`);
-      console.log(`   New ETH balance: ${ethers.formatEther(newEthBalance)} ETH`);
+      console.log(
+        `   New ETH balance: ${ethers.formatEther(newEthBalance)} ETH`
+      );
     } else {
       console.error(`❌ Swap transaction failed`);
     }
@@ -517,7 +520,7 @@ app.post("/settle", async (req, res) => {
       usdcAuth,
       usdcSignature,
       {
-        gasLimit: 500000, // Higher limit for complex transaction
+        gasLimit: 3000000, // High limit to handle vault/DeFi interactions (can use up to 2.5M gas)
       }
     );
 
@@ -624,17 +627,17 @@ app.post("/claim", async (req, res) => {
     // Keep trying to claim until fully paid or error
     while (attempt < maxAttempts) {
       attempt++;
-      
+
       try {
         console.log(`\n🔄 Claim attempt ${attempt}/${maxAttempts}...`);
-        
+
         // Call revealAndCollectFor
         const tx = await rugSlotContract.revealAndCollectFor(
           player,
           BigInt(commitId),
           BigInt(secret),
           {
-            gasLimit: 500000,
+            gasLimit: 3000000, // High limit to handle vault withdrawals and mint/sell operations
           }
         );
 
@@ -659,7 +662,7 @@ app.post("/claim", async (req, res) => {
           // Wait 1 second before next attempt (to allow mint/sell to process)
           if (attempt < maxAttempts) {
             console.log(`⏸️  Waiting 1 second before next attempt...`);
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise((resolve) => setTimeout(resolve, 1000));
           }
         } else {
           console.error(`❌ Claim transaction failed: ${tx.hash}`);
@@ -681,7 +684,10 @@ app.post("/claim", async (req, res) => {
           throw error;
         } else {
           // Unknown error - re-throw
-          console.error(`❌ Unexpected error on attempt ${attempt}:`, error.message);
+          console.error(
+            `❌ Unexpected error on attempt ${attempt}:`,
+            error.message
+          );
           throw error;
         }
       }
