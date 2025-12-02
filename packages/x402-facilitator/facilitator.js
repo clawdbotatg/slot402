@@ -33,6 +33,119 @@ if (!PRIVATE_KEY || !BASE_RPC_URL) {
 const provider = new ethers.JsonRpcProvider(BASE_RPC_URL);
 const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 
+// Nonce management for concurrent transactions
+let currentNonce = null;
+let pendingNonceInit = null;
+const playerQueues = new Map(); // player address -> array of pending transactions
+const processingPlayers = new Set(); // track which players are being processed
+const pendingProcessingTimeouts = new Map(); // player -> timeout ID for debounce
+const QUEUE_DEBOUNCE_MS = 100; // Wait 100ms for concurrent requests to arrive
+
+/**
+ * Initialize nonce from the network
+ */
+async function initializeNonce() {
+  if (pendingNonceInit) {
+    return pendingNonceInit;
+  }
+  
+  pendingNonceInit = (async () => {
+    currentNonce = await provider.getTransactionCount(wallet.address, 'pending');
+    console.log(`🔢 Initialized nonce: ${currentNonce}`);
+    return currentNonce;
+  })();
+  
+  return pendingNonceInit;
+}
+
+/**
+ * Get next nonce for transaction
+ */
+function getNextNonce() {
+  if (currentNonce === null) {
+    throw new Error('Nonce not initialized');
+  }
+  const nonce = currentNonce;
+  currentNonce++;
+  return nonce;
+}
+
+/**
+ * Process transaction queue for a specific player to ensure serial execution
+ */
+async function processPlayerQueue(playerAddress) {
+  // Normalize address to lowercase for consistent mapping
+  const player = playerAddress.toLowerCase();
+  
+  if (processingPlayers.has(player)) {
+    return; // Already processing this player
+  }
+  
+  const queue = playerQueues.get(player);
+  if (!queue || queue.length === 0) {
+    return;
+  }
+  
+  processingPlayers.add(player);
+  
+  while (queue.length > 0) {
+    const { txFunction, resolve, reject } = queue.shift();
+    try {
+      const result = await txFunction();
+      resolve(result);
+    } catch (error) {
+      reject(error);
+    }
+  }
+  
+  // Clean up empty queue
+  if (queue.length === 0) {
+    playerQueues.delete(player);
+  }
+  
+  processingPlayers.delete(player);
+}
+
+/**
+ * Queue a transaction for serial execution with per-player nonce ordering
+ * Uses debounce to wait for concurrent requests to arrive before processing
+ * @param {string} playerAddress - The player's address (for queue separation)
+ * @param {number} nonce - The player's nonce (for ordering within queue)
+ * @param {function} txFunction - The transaction function to execute
+ */
+function queueTransaction(playerAddress, nonce, txFunction) {
+  return new Promise((resolve, reject) => {
+    // Normalize address to lowercase for consistent mapping
+    const player = playerAddress.toLowerCase();
+    
+    // Get or create queue for this player
+    if (!playerQueues.has(player)) {
+      playerQueues.set(player, []);
+    }
+    const queue = playerQueues.get(player);
+    
+    // Add transaction to player's queue
+    queue.push({ nonce, txFunction, resolve, reject });
+    
+    // Sort queue by nonce (ascending) to ensure sequential processing
+    queue.sort((a, b) => a.nonce - b.nonce);
+    
+    // Debounce: Cancel any pending processing timeout for this player
+    if (pendingProcessingTimeouts.has(player)) {
+      clearTimeout(pendingProcessingTimeouts.get(player));
+    }
+    
+    // Schedule processing after debounce delay
+    // This allows concurrent requests to arrive and get sorted before any start processing
+    const timeoutId = setTimeout(() => {
+      pendingProcessingTimeouts.delete(player);
+      processPlayerQueue(player);
+    }, QUEUE_DEBOUNCE_MS);
+    
+    pendingProcessingTimeouts.set(player, timeoutId);
+  });
+}
+
 // Load deployed contracts from Foundry broadcast
 console.log(`🔍 Loading deployment for chain ID: ${CHAIN_ID}`);
 
@@ -201,54 +314,70 @@ async function checkAndRefillETH() {
       `💵 Swapping ${ethers.formatUnits(usdcBalance, 6)} USDC to ETH...`
     );
 
-    // Approve Uniswap router to spend USDC
-    console.log(`   Approving Uniswap router...`);
-    const approveTx = await usdcContract.approve(
-      UNISWAP_V2_ROUTER,
-      usdcBalance
-    );
-    await approveTx.wait();
-    console.log(`   ✅ Approval confirmed`);
-
-    // Prepare swap path: USDC -> WETH
-    const path = [USDC_ADDRESS, WETH_ADDRESS];
-
-    // Get expected output amount
-    const routerContract = new ethers.Contract(
-      UNISWAP_V2_ROUTER,
-      UNISWAP_V2_ROUTER_ABI,
-      wallet
-    );
-
-    const amountsOut = await routerContract.getAmountsOut(usdcBalance, path);
-    const expectedETH = amountsOut[1];
-    console.log(
-      `   Expected to receive: ${ethers.formatEther(expectedETH)} ETH`
-    );
-
-    // Execute swap with 5% slippage tolerance
-    const minAmountOut = (expectedETH * 95n) / 100n;
-    const deadline = Math.floor(Date.now() / 1000) + 300; // 5 minutes
-
-    console.log(`   Executing swap...`);
-    const swapTx = await routerContract.swapExactTokensForETH(
-      usdcBalance,
-      minAmountOut,
-      path,
+    // Queue transactions to ensure serial execution with proper nonce
+    // Use facilitator address with timestamp as synthetic nonce for internal operations
+    const { receipt, txHash } = await queueTransaction(
       wallet.address,
-      deadline,
-      {
-        gasLimit: 300000,
+      Date.now(), // Use timestamp as synthetic nonce for facilitator operations
+      async () => {
+        // Approve Uniswap router to spend USDC
+        console.log(`   Approving Uniswap router...`);
+        const approveNonce = getNextNonce();
+        const approveTx = await usdcContract.approve(
+          UNISWAP_V2_ROUTER,
+          usdcBalance,
+          {
+            nonce: approveNonce,
+          }
+        );
+        await approveTx.wait();
+        console.log(`   ✅ Approval confirmed`);
+
+        // Prepare swap path: USDC -> WETH
+        const path = [USDC_ADDRESS, WETH_ADDRESS];
+
+        // Get expected output amount
+        const routerContract = new ethers.Contract(
+          UNISWAP_V2_ROUTER,
+          UNISWAP_V2_ROUTER_ABI,
+          wallet
+        );
+
+        const amountsOut = await routerContract.getAmountsOut(usdcBalance, path);
+        const expectedETH = amountsOut[1];
+        console.log(
+          `   Expected to receive: ${ethers.formatEther(expectedETH)} ETH`
+        );
+
+        // Execute swap with 5% slippage tolerance
+        const minAmountOut = (expectedETH * 95n) / 100n;
+        const deadline = Math.floor(Date.now() / 1000) + 300; // 5 minutes
+
+        console.log(`   Executing swap...`);
+        const swapNonce = getNextNonce();
+        const swapTx = await routerContract.swapExactTokensForETH(
+          usdcBalance,
+          minAmountOut,
+          path,
+          wallet.address,
+          deadline,
+          {
+            gasLimit: 300000,
+            nonce: swapNonce,
+          }
+        );
+
+        console.log(`   Transaction sent: ${swapTx.hash}`);
+        const receipt = await swapTx.wait();
+        
+        return { receipt, txHash: swapTx.hash };
       }
     );
-
-    console.log(`   Transaction sent: ${swapTx.hash}`);
-    const receipt = await swapTx.wait();
 
     if (receipt.status === 1) {
       const newEthBalance = await provider.getBalance(wallet.address);
       console.log(`✅ Swap successful!`);
-      console.log(`   Transaction: ${swapTx.hash}`);
+      console.log(`   Transaction: ${txHash}`);
       console.log(
         `   New ETH balance: ${ethers.formatEther(newEthBalance)} ETH`
       );
@@ -473,16 +602,12 @@ app.post("/settle", async (req, res) => {
       );
     }
 
-    // Get expected commit ID before calling
+    // Create contract instance (we'll get the actual commit ID after transaction succeeds)
     const rugSlotContract = new ethers.Contract(
       RUGSLOT_CONTRACT,
       RUGSLOT_ABI,
       wallet
     );
-    const expectedCommitId = await rugSlotContract.commitCount(
-      metaCommit.player
-    );
-    console.log(`   Expected commit ID: ${expectedCommitId.toString()}`);
 
     // Prepare USDC authorization struct
     const usdcAuth = {
@@ -494,8 +619,8 @@ app.post("/settle", async (req, res) => {
       nonce: auth.nonce,
     };
 
-    // Execute commitWithMetaTransaction
-    console.log(`\n🔄 Sending transaction...`);
+    // Execute commitWithMetaTransaction with proper nonce management
+    console.log(`\n🔄 Queueing transaction for serial execution...`);
     console.log(`   DEBUG: Parameters being sent:`);
     console.log(`   - player: ${metaCommit.player}`);
     console.log(`   - commitHash: ${metaCommit.commitHash}`);
@@ -511,31 +636,51 @@ app.post("/settle", async (req, res) => {
     console.log(`   - usdcAuth.nonce: ${usdcAuth.nonce}`);
     console.log(`   - usdcSignature length: ${usdcSignature.length}`);
 
-    const tx = await rugSlotContract.commitWithMetaTransaction(
+    // Queue transaction to ensure serial execution with proper nonce ordering per player
+    const { tx, receipt } = await queueTransaction(
       metaCommit.player,
-      metaCommit.commitHash,
-      BigInt(metaCommit.nonce),
-      BigInt(metaCommit.deadline),
-      metaCommit.signature,
-      wallet.address, // facilitator address
-      usdcAuth,
-      usdcSignature,
-      {
-        gasLimit: 5000000, // High limit to handle vault/DeFi interactions (can use up to 3M gas)
+      metaCommit.nonce,
+      async () => {
+        const txNonce = getNextNonce();
+        console.log(`   🔢 Using facilitator nonce: ${txNonce}`);
+        
+        const tx = await rugSlotContract.commitWithMetaTransaction(
+          metaCommit.player,
+          metaCommit.commitHash,
+          BigInt(metaCommit.nonce),
+          BigInt(metaCommit.deadline),
+          metaCommit.signature,
+          wallet.address, // facilitator address
+          usdcAuth,
+          usdcSignature,
+          {
+            gasLimit: 5000000, // High limit to handle vault/DeFi interactions (can use up to 3M gas)
+            nonce: txNonce, // Manually specify nonce
+          }
+        );
+
+        console.log(`⏳ Transaction sent: ${tx.hash}`);
+        console.log(`   Waiting for confirmation...`);
+
+        const receipt = await tx.wait();
+        
+        return { tx, receipt };
       }
     );
 
-    console.log(`⏳ Transaction sent: ${tx.hash}`);
-    console.log(`   Waiting for confirmation...`);
-
-    const receipt = await tx.wait();
-
     if (receipt.status === 1) {
+      // Get the actual commit ID after transaction succeeds
+      // The new commit ID is commitCount - 1 (since commitCount was just incremented)
+      const actualCommitCount = await rugSlotContract.commitCount(
+        metaCommit.player
+      );
+      const actualCommitId = actualCommitCount - 1n;
+      
       console.log(`✅ Payment settled and commit created!`);
       console.log(`   Transaction: ${tx.hash}`);
       console.log(`   Block: ${receipt.blockNumber}`);
       console.log(`   Gas used: ${receipt.gasUsed.toString()}`);
-      console.log(`   Commit ID: ${expectedCommitId.toString()}`);
+      console.log(`   Commit ID: ${actualCommitId.toString()}`);
 
       return res.status(200).json({
         success: true,
@@ -544,7 +689,7 @@ app.post("/settle", async (req, res) => {
         payer: auth.from,
         blockNumber: receipt.blockNumber,
         gasUsed: receipt.gasUsed.toString(),
-        commitId: expectedCommitId.toString(),
+        commitId: actualCommitId.toString(),
       });
     } else {
       console.error(`❌ Transaction failed: ${tx.hash}`);
@@ -632,20 +777,33 @@ app.post("/claim", async (req, res) => {
       try {
         console.log(`\n🔄 Claim attempt ${attempt}/${maxAttempts}...`);
 
-        // Call revealAndCollectFor
-        const tx = await rugSlotContract.revealAndCollectFor(
+        // Queue transaction to ensure serial execution with proper nonce ordering per player
+        const { tx, receipt } = await queueTransaction(
           player,
-          BigInt(commitId),
-          BigInt(secret),
-          {
-            gasLimit: 5000000, // High limit to handle vault withdrawals and mint/sell operations
+          commitId, // Use commitId as ordering nonce for claims
+          async () => {
+            const txNonce = getNextNonce();
+            console.log(`   🔢 Using facilitator nonce: ${txNonce}`);
+            
+            // Call revealAndCollectFor
+            const tx = await rugSlotContract.revealAndCollectFor(
+              player,
+              BigInt(commitId),
+              BigInt(secret),
+              {
+                gasLimit: 5000000, // High limit to handle vault withdrawals and mint/sell operations
+                nonce: txNonce, // Manually specify nonce
+              }
+            );
+
+            console.log(`⏳ Transaction sent: ${tx.hash}`);
+            console.log(`   Waiting for confirmation...`);
+
+            const receipt = await tx.wait();
+            
+            return { tx, receipt };
           }
         );
-
-        console.log(`⏳ Transaction sent: ${tx.hash}`);
-        console.log(`   Waiting for confirmation...`);
-
-        const receipt = await tx.wait();
 
         if (receipt.status === 1) {
           console.log(`✅ Claim transaction successful!`);
@@ -773,6 +931,7 @@ app.get("/health", (req, res) => {
 // Start server
 async function start() {
   await checkBalance();
+  await initializeNonce();
 
   app.listen(PORT, () => {
     console.log(`\n🚀 x402 Facilitator running!`);
