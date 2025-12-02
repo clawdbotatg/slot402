@@ -52,6 +52,7 @@ export default function Home() {
   const [isSwapping, setIsSwapping] = useState(false);
   const [isX402Rolling, setIsX402Rolling] = useState(false);
   const [x402Error, setX402Error] = useState<string | null>(null);
+  const [x402Won, setX402Won] = useState(false);
 
   // Map Symbol enum to image paths
   const symbolToImage = (symbolIndex: number): string => {
@@ -524,6 +525,7 @@ export default function Home() {
 
     setIsX402Rolling(true);
     setX402Error(null);
+    setX402Won(false);
     setReelPositions(null); // Clear previous reel positions
 
     try {
@@ -689,6 +691,7 @@ export default function Home() {
 
       const result = await submitResponse.json();
       console.log("🎉 Roll result received:", result);
+      console.log("🎰 Result details - Won:", result.roll.won, "Claim TX:", result.roll.claimTransaction);
 
       // Step 7: Set reel positions to stop animations
       setReelPositions({
@@ -711,10 +714,13 @@ export default function Home() {
         );
       }
 
-      // Step 8: If won and auto-claimed, just show success (no need to add to pending reveals)
-      if (result.roll.won && result.roll.claimTransaction) {
-        console.log(`✅ Winner! Automatically claimed: ${result.roll.claimTransaction}`);
-        // Winnings were automatically sent to player - no action needed!
+      // Step 8: If won, mark it so we celebrate after animations
+      if (result.roll.won) {
+        console.log(`🎊 WINNER! Payout: $${(Number(result.roll.payout) / 1e6).toFixed(2)} USDC`);
+        if (result.roll.claimTransaction) {
+          console.log(`✅ Winnings auto-claimed: ${result.roll.claimTransaction}`);
+        }
+        setX402Won(true); // Mark as won so sound plays after animations
       }
     } catch (error: any) {
       console.error("❌ x402 roll failed:", error);
@@ -787,13 +793,19 @@ export default function Home() {
                       // Clear the rolling state now that animations are done
                       clearRollingState();
 
-                      // If there are pending reveals, play jackpot alarm
-                      if (pendingReveals.length > 0) {
+                      // If there are pending reveals OR x402 win, play jackpot alarm
+                      if (pendingReveals.length > 0 || x402Won) {
+                        console.log("🔊 Playing jackpot alarm! (pending reveals or x402 win)");
                         const jackpotAlarm = new Audio("/sounds/541655__timbre__jackpot-alarm.wav");
                         jackpotAlarm.volume = 0.6;
                         jackpotAlarm.play().catch(error => {
                           console.log("Error playing jackpot alarm:", error);
                         });
+                      }
+
+                      // Reset x402Won flag after playing sound
+                      if (x402Won) {
+                        setX402Won(false);
                       }
                     }}
                     reel1Symbols={reel1Symbols}
