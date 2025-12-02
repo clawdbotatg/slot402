@@ -304,7 +304,7 @@ async function rollSlot() {
 
   if (result.roll.won) {
     console.log(`\n🎉 🎉 🎉 WINNER! 🎉 🎉 🎉`);
-    console.log(`   Payout: ${ethers.formatUnits(result.roll.payout, 6)} USDC`);
+    console.log(`   Payout: ${result.roll.payout}`);
 
     if (result.roll.claimTransaction) {
       console.log(`\n✅ Winnings automatically claimed!`);

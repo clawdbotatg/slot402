@@ -1143,7 +1143,7 @@ const rollResponse = await fetch(\`\${API_URL}/roll\`, {
 });
 if (rollResponse.status !== 402) throw new Error("Expected 402");
 const payment = await rollResponse.json();
-console.log(\`💳 Bet: \${ethers.formatUnits(payment.pricing.betSize, 6)} USDC + \${ethers.formatUnits(payment.pricing.facilitatorFee, 6)} fee\`);
+console.log(\`💳 Bet: \${payment.pricing.betSize} + \${payment.pricing.facilitatorFee} fee\`);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STEP 2: Create contract instance using address from 402 response
@@ -1231,7 +1231,7 @@ const result = await submitRes.json();
 const [s1, s2, s3] = result.roll.symbols;
 console.log(\`🎰 [ \${s1} ] [ \${s2} ] [ \${s3} ]\`);
 if (result.roll.won) {
-  console.log(\`🏆 WON \${ethers.formatUnits(result.roll.payout, 6)} USDC!\`);
+  console.log(\`🏆 WON \${result.roll.payout}!\`);
   console.log(\`✅ https://basescan.org/tx/\${result.roll.claimTransaction}\`);
 }`;
                       navigator.clipboard.writeText(code);
@@ -1290,7 +1290,7 @@ const rollResponse = await fetch(\`\${API_URL}/roll\`, {
 });
 if (rollResponse.status !== 402) throw new Error("Expected 402");
 const payment = await rollResponse.json();
-console.log(\`💳 Bet: \${ethers.formatUnits(payment.pricing.betSize, 6)} USDC + \${ethers.formatUnits(payment.pricing.facilitatorFee, 6)} fee\`);
+console.log(\`💳 Bet: \${payment.pricing.betSize} + \${payment.pricing.facilitatorFee} fee\`);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STEP 2: Create contract instance using address from 402 response
@@ -1378,7 +1378,7 @@ const result = await submitRes.json();
 const [s1, s2, s3] = result.roll.symbols;
 console.log(\`🎰 [ \${s1} ] [ \${s2} ] [ \${s3} ]\`);
 if (result.roll.won) {
-  console.log(\`🏆 WON \${ethers.formatUnits(result.roll.payout, 6)} USDC!\`);
+  console.log(\`🏆 WON \${result.roll.payout}!\`);
   console.log(\`✅ https://basescan.org/tx/\${result.roll.claimTransaction}\`);
 }`}
                 </SyntaxHighlighter>

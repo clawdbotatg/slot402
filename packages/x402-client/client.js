@@ -357,9 +357,7 @@ async function executeRoll() {
 
     if (result.roll.won) {
       console.log(`\n🎉 🎉 🎉 WINNER! 🎉 🎉 🎉`);
-      console.log(
-        `   Payout: ${ethers.formatUnits(result.roll.payout, 6)} USDC`
-      );
+      console.log(`   Payout: ${result.roll.payout}`);
       console.log(`   Commit ID: ${result.roll.commitId}`);
       console.log(`   Secret: ${result.roll.secret.substring(0, 20)}...`);
 
