@@ -1,13 +1,15 @@
-# 🎰 Slot402 - (Gasless) x402 Slot Machine on Base
+# 🎰 Slot402 - Yield-Earning Gasless Slot Machine on Base
 
 > let your agents take it for a spin :)
 
 **Live at**: [https://slot402.com](https://slot402.com)
 
-A **fully gasless** on-chain slot machine powered by x402 payments and EIP-3009.
+A **fully gasless** on-chain slot machine where the treasury earns yield in DeFi, excess profits buy back and burn the token, and token holders are effectively **the house**.
 
-- **Fully x402 compliant**
-- **Provably fair** (commit-reveal on Base L2)
+- **Fully x402 compliant** - Pay with signatures, not gas
+- **Provably fair** - Commit-reveal randomness on Base L2
+- **Yield-earning treasury** - Idle USDC earns yield in Summer.fi vault
+- **Deflationary tokenomics** - Excess profits buy back and burn tokens
 - **Live on Base Mainnet**
 
 <img width="1335" height="1188" alt="Slot Machine" src="https://github.com/user-attachments/assets/a1c641ae-91bb-4c15-a051-311df503dd32" />
@@ -15,51 +17,71 @@ A **fully gasless** on-chain slot machine powered by x402 payments and EIP-3009.
 ## Quick Start - Roll via Script
 
 ```javascript
-const { ethers } = require("ethers");
-const { processPayment } = require("a2a-x402");
+// ═══════════════════════════════════════════════════════════════════════════════
+// SLOT402 CLIENT - Complete copy/paste example for ethers v6
+// Create .env file with PRIVATE_KEY=0x... then run: node slot402.js
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// Your wallet (needs 0.06+ USDC, zero ETH required!)
-const provider = new ethers.JsonRpcProvider(
-  "https://base-mainnet.g.alchemy.com/v2/YOUR_KEY"
+import "dotenv/config";
+import { ethers } from "ethers";
+
+const CHAIN_ID = 8453;
+const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+const API_URL = "https://api.slot402.com:8000";
+
+if (!process.env.PRIVATE_KEY) throw new Error("PRIVATE_KEY not set in .env");
+const provider = new ethers.JsonRpcProvider("https://mainnet.base.org");
+const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 1: Request roll → Server returns 402 with payment details
+// ─────────────────────────────────────────────────────────────────────────────
+const rollResponse = await fetch(`${API_URL}/roll`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ player: wallet.address }),
+});
+if (rollResponse.status !== 402) throw new Error("Expected 402");
+const payment = await rollResponse.json();
+console.log(
+  `💳 Bet: ${payment.pricing.betSize} + ${payment.pricing.facilitatorFee} fee`
 );
-const wallet = new ethers.Wallet("YOUR_PRIVATE_KEY", provider);
 
-const S402_CONTRACT = "0x7be89683ce922f4da8085796b5527847ff5b2879";
-const SERVER_URL = "https://api.slot402.com:8000"; // Production x402 server
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 2: Create contract instance using address from 402 response
+// ─────────────────────────────────────────────────────────────────────────────
+const SLOT402 = payment.accepts[0].payTo; // ← Contract address is here!
+const contract = new ethers.Contract(
+  SLOT402,
+  [
+    "function getCommitHash(uint256 secret) view returns (bytes32)",
+    "function nonces(address) view returns (uint256)",
+  ],
+  provider
+);
 
-async function roll() {
-  // 1. Request roll from server
-  const res = await fetch(`${SERVER_URL}/roll`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ player: wallet.address }),
-  });
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 3: Generate secret and fetch commit data
+// ─────────────────────────────────────────────────────────────────────────────
+const secret = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString();
+const [commitHash, nonce] = await Promise.all([
+  contract.getCommitHash(BigInt(secret)),
+  contract.nonces(wallet.address),
+]);
 
-  const { requestId, accepts } = await res.json();
-  const requirements = accepts[0];
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 4: Sign MetaCommit (EIP-712) and USDC payment (EIP-3009)
+// ─────────────────────────────────────────────────────────────────────────────
+const deadline = Math.floor(Date.now() / 1000) + 300;
 
-  // 2. Get contract data
-  const contract = new ethers.Contract(
-    S402_CONTRACT,
-    [
-      "function getCommitHash(uint256) pure returns (bytes32)",
-      "function nonces(address) view returns (uint256)",
-    ],
-    provider
-  );
-
-  const secret = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString();
-  const commitHash = await contract.getCommitHash(BigInt(secret));
-  const nonce = await contract.nonces(wallet.address);
-  const deadline = Math.floor(Date.now() / 1000) + 300;
-
-  // 3. Sign MetaCommit (EIP-712)
-  const metaCommitSig = await wallet.signTypedData(
+const [metaCommitSig, paymentPayload] = await Promise.all([
+  // MetaCommit signature (EIP-712)
+  wallet.signTypedData(
     {
       name: "Slot402",
       version: "1",
-      chainId: 8453,
-      verifyingContract: S402_CONTRACT,
+      chainId: BigInt(CHAIN_ID),
+      verifyingContract: SLOT402,
     },
     {
       MetaCommit: [
@@ -69,42 +91,208 @@ async function roll() {
         { name: "deadline", type: "uint256" },
       ],
     },
-    { player: wallet.address, commitHash, nonce, deadline }
-  );
-
-  // 4. Sign USDC payment (EIP-3009)
-  const paymentPayload = await processPayment(requirements, wallet);
-
-  // 5. Submit and get result
-  const result = await fetch(`${SERVER_URL}/roll/submit`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      requestId,
-      paymentPayload,
-      metaCommit: {
-        player: wallet.address,
-        commitHash,
-        nonce: nonce.toString(),
-        deadline,
-        signature: metaCommitSig,
+    { player: wallet.address, commitHash, nonce, deadline: BigInt(deadline) }
+  ),
+  // USDC payment signature (EIP-3009 transferWithAuthorization)
+  (async () => {
+    const pm = payment.accepts[0];
+    const auth = {
+      from: wallet.address,
+      to: pm.payTo,
+      value: pm.maxAmountRequired,
+      validAfter: 0,
+      validBefore:
+        Math.floor(Date.now() / 1000) + (pm.maxTimeoutSeconds || 600),
+      nonce: ethers.hexlify(ethers.randomBytes(32)),
+    };
+    const signature = await wallet.signTypedData(
+      {
+        name: pm.extra?.name || "USD Coin",
+        version: pm.extra?.version || "2",
+        chainId: BigInt(pm.extra?.chainId || CHAIN_ID),
+        verifyingContract: pm.asset || USDC_ADDRESS,
       },
-      secret,
-    }),
-  }).then((r) => r.json());
+      {
+        TransferWithAuthorization: [
+          { name: "from", type: "address" },
+          { name: "to", type: "address" },
+          { name: "value", type: "uint256" },
+          { name: "validAfter", type: "uint256" },
+          { name: "validBefore", type: "uint256" },
+          { name: "nonce", type: "bytes32" },
+        ],
+      },
+      {
+        ...auth,
+        value: BigInt(auth.value),
+        validAfter: BigInt(auth.validAfter),
+        validBefore: BigInt(auth.validBefore),
+      }
+    );
+    return {
+      payload: { authorization: auth, signature },
+      network: pm.network,
+      scheme: pm.scheme,
+    };
+  })(),
+]);
 
-  // 6. Done! Check result
-  console.log(`Result: [ ${result.roll.symbols.join(" ] [ ")} ]`);
-  if (result.roll.won) {
-    console.log(`WON ${result.roll.payout / 1e6} USDC!`);
-    console.log(`Auto-claimed: ${result.roll.claimTransaction}`);
-  }
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 5: Submit to server and display result
+// ─────────────────────────────────────────────────────────────────────────────
+const submitRes = await fetch(`${API_URL}/roll/submit`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    requestId: payment.requestId,
+    paymentPayload,
+    metaCommit: {
+      player: wallet.address,
+      commitHash,
+      nonce: nonce.toString(),
+      deadline,
+      signature: metaCommitSig,
+    },
+    secret,
+  }),
+});
+if (!submitRes.ok) throw new Error("Submit failed: " + submitRes.status);
+
+const result = await submitRes.json();
+const [s1, s2, s3] = result.roll.symbols;
+console.log(`🎰 [ ${s1} ] [ ${s2} ] [ ${s3} ]`);
+if (result.roll.won) {
+  console.log(`🏆 WON ${result.roll.payout}!`);
+  console.log(`✅ https://basescan.org/tx/${result.roll.claimTransaction}`);
 }
-
-roll();
 ```
 
-## How It Works
+---
+
+## 🏦 DeFi-Powered Treasury
+
+Slot402 isn't just a slot machine - it's a **yield-earning protocol** with built-in tokenomics.
+
+### How The Treasury Works
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         SLOT402 TREASURY                                │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│   ┌─────────────────┐         ┌─────────────────────────────────────┐  │
+│   │  Player Bets    │────────▶│  Contract Balance                   │  │
+│   │  $0.05 USDC     │         │  (Immediate liquidity)              │  │
+│   └─────────────────┘         └───────────────┬─────────────────────┘  │
+│                                               │                         │
+│                                               ▼                         │
+│                               ┌───────────────────────────────────────┐ │
+│                               │  VaultManager → Summer.fi LVUSDC      │ │
+│                               │  ═══════════════════════════════════  │ │
+│                               │  • Deposits idle USDC into DeFi vault │ │
+│                               │  • Earns yield on $15+ reserve        │ │
+│                               │  • Auto-withdraws for big payouts     │ │
+│                               └───────────────────────────────────────┘ │
+│                                                                         │
+│   ┌─────────────────────────────────────────────────────────────────┐  │
+│   │  AUTOMATED TREASURY MANAGEMENT                                   │  │
+│   │  ─────────────────────────────────────────────────────────────── │  │
+│   │                                                                  │  │
+│   │  IF treasury > $16.35 + $1 buffer:                               │  │
+│   │     → Swap excess USDC for $SLOT tokens on Uniswap               │  │
+│   │     → Burn tokens to 0xdead 🔥                                   │  │
+│   │     → Deflationary pressure on token                             │  │
+│   │                                                                  │  │
+│   │  IF payout > treasury balance:                                   │  │
+│   │     → Mint new $SLOT tokens                                      │  │
+│   │     → Sell tokens for USDC on Uniswap                            │  │
+│   │     → Pay winner in full (guaranteed!)                           │  │
+│   │                                                                  │  │
+│   └─────────────────────────────────────────────────────────────────┘  │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Treasury Parameters
+
+| Parameter            | Value        | Description                                   |
+| -------------------- | ------------ | --------------------------------------------- |
+| **Vault Threshold**  | $15 USDC     | Target amount kept earning yield in Summer.fi |
+| **Treasury Reserve** | $16.35 USDC  | Minimum reserve to cover expected payouts     |
+| **Buyback Buffer**   | $1 USDC      | Excess above reserve triggers buyback & burn  |
+| **Max Jackpot**      | $441.95 USDC | 8839x multiplier on $0.05 bet (BASEETH)       |
+
+### Yield Generation
+
+The treasury uses **Summer.fi's FleetCommander vault (LVUSDC)** on Base:
+
+1. **Idle USDC** → Deposited into yield-bearing vault
+2. **Vault shares (LVUSDC)** → Appreciate over time as yield accrues
+3. **Withdrawals** → Instant when needed for payouts
+
+This means the house is always earning, even when nobody is playing!
+
+---
+
+## 🪙 Token Economics: Be The House
+
+**Slot402Token ($SLOT)** represents ownership in the slot machine itself. When you hold $SLOT, you're essentially **being the house**.
+
+### How Token Value Accrues
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    $SLOT TOKEN FLYWHEEL                          │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│    Players Lose                Players Win Big                   │
+│         │                            │                           │
+│         ▼                            ▼                           │
+│  ┌─────────────┐              ┌─────────────┐                   │
+│  │ Treasury    │              │ Treasury    │                   │
+│  │ Grows       │              │ Shrinks     │                   │
+│  └──────┬──────┘              └──────┬──────┘                   │
+│         │                            │                           │
+│         ▼                            ▼                           │
+│  ┌─────────────┐              ┌─────────────┐                   │
+│  │ BUYBACK &   │              │ MINT &      │                   │
+│  │ BURN 🔥     │              │ SELL        │                   │
+│  │             │              │             │                   │
+│  │ USDC → SLOT │              │ SLOT → USDC │                   │
+│  │ SLOT → 🔥   │              │ Pay winner  │                   │
+│  └──────┬──────┘              └──────┬──────┘                   │
+│         │                            │                           │
+│         ▼                            ▼                           │
+│  ┌─────────────┐              ┌─────────────┐                   │
+│  │ Supply ↓    │              │ Supply ↑    │                   │
+│  │ Price ↑     │              │ Price ↓     │                   │
+│  └─────────────┘              └─────────────┘                   │
+│                                                                  │
+│  Over time: House edge means more buybacks than mints            │
+│  Result: Net deflationary pressure on $SLOT                      │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Token Distribution
+
+| Allocation           | Amount                   | Purpose                              |
+| -------------------- | ------------------------ | ------------------------------------ |
+| **Token Sale**       | 20,000 $SLOT             | Sold for $20 USDC (0.001 USDC/token) |
+| **Liquidity Pool**   | 3,650 $SLOT + $3.65 USDC | Initial Uniswap V2 pool (18.25%)     |
+| **Treasury Reserve** | -                        | Remaining $16.35 USDC (81.75%)       |
+
+### Why Hold $SLOT?
+
+1. **You ARE the house** - Token price reflects house profitability
+2. **Deflationary by design** - House edge = more burns than mints
+3. **Yield-backed** - Treasury earns DeFi yield even when idle
+4. **Transparent** - All buybacks/burns visible on-chain
+5. **Liquidity** - Trade anytime on Uniswap
+
+---
+
+## How x402 Works
 
 ### The Problem x402 Solves
 
@@ -131,6 +319,7 @@ With x402, players pay **ZERO gas**. They only pay 0.06 USDC (0.05 bet + 0.01 fa
        ├─ Verifies MetaCommit signature ✅
        ├─ Calls USDC.transferWithAuthorization() (0.06 USDC)
        ├─ Pays 0.01 USDC to facilitator
+       ├─ Deposits excess to yield vault 📈
        └─ Creates commit for player
 
 4. Server polls Slot402.isWinner()
@@ -138,6 +327,7 @@ With x402, players pay **ZERO gas**. They only pay 0.06 USDC (0.05 bet + 0.01 fa
 
 5. If winner, Facilitator auto-claims:
    └─ Calls Slot402.revealAndCollectFor()
+       ├─ Withdraws from vault if needed
        └─ Sends USDC directly to player! 💰
 ```
 
@@ -151,19 +341,48 @@ With x402, players pay **ZERO gas**. They only pay 0.06 USDC (0.05 bet + 0.01 fa
 
 ### Economics
 
-| Party           | Pays        | Receives                  |
-| --------------- | ----------- | ------------------------- |
-| **Player**      | 0.06 USDC   | 0.05-441.95 USDC (if win) |
-| **Player**      | $0.00 gas   | -                         |
-| **Facilitator** | ~$0.002 gas | 0.01 USDC per roll        |
-| **Contract**    | -           | 0.05 USDC per roll        |
+| Party           | Pays        | Receives                            |
+| --------------- | ----------- | ----------------------------------- |
+| **Player**      | 0.06 USDC   | 0.60-441.95 USDC (if win)           |
+| **Player**      | $0.00 gas   | -                                   |
+| **Facilitator** | ~$0.002 gas | 0.01 USDC per roll                  |
+| **Treasury**    | -           | 0.05 USDC per roll (earning yield!) |
 
 **Facilitator profit**: ~$0.008 per roll ($0.01 USDC - $0.002 gas)
+
+---
 
 ## Smart Contracts
 
 **Slot402**: `0x7be89683ce922f4da8085796b5527847ff5b2879` (Base)  
 **Slot402Token**: `0x0e78151b5fafe87500dfc8a9c979ff1a80523493` (Base)
+
+### Contract Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           Slot402.sol                                   │
+│  ═══════════════════════════════════════════════════════════════════   │
+│  Main slot machine: commit-reveal, payouts, meta-transactions           │
+├─────────────────────────────────────────────────────────────────────────┤
+│                               │                                         │
+│            ┌──────────────────┼──────────────────┐                      │
+│            ▼                  ▼                  ▼                      │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐         │
+│  │ SimpleTokenSale │  │ ManagedTreasury │  │  VaultManager   │         │
+│  │ ═══════════════ │  │ ═══════════════ │  │ ═══════════════ │         │
+│  │ Token sale      │  │ Uniswap swaps   │  │ Summer.fi vault │         │
+│  │ phase mgmt      │  │ Buyback & burn  │  │ Yield earning   │         │
+│  └────────┬────────┘  │ Emergency mint  │  │ Auto-withdraw   │         │
+│           │           └────────┬────────┘  └────────┬────────┘         │
+│           ▼                    ▼                    ▼                   │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                      Slot402Token.sol                            │   │
+│  │  ═══════════════════════════════════════════════════════════════ │   │
+│  │  ERC20 token with mint capability (controlled by Slot402)        │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
 ### Key Functions
 
@@ -176,6 +395,11 @@ With x402, players pay **ZERO gas**. They only pay 0.06 USDC (0.05 bet + 0.01 fa
 
 - `commit()` - Direct roll (requires USDC approval + gas)
 - `revealAndCollect()` - Direct claim (requires gas)
+
+**Treasury Management:**
+
+- `getVaultBalance()` - Current USDC in yield vault
+- `getTotalUSDCBalance()` - Total USDC (contract + vault)
 
 **View Functions:**
 
@@ -212,117 +436,7 @@ The slot machine uses **commit-reveal** for provable fairness:
 
 Each reel has 45 positions with varying symbol distributions (9 cherries, 8 oranges, 7 watermelons... 1 baseeth).
 
-### Treasury Management
-
-The contract implements **automated treasury management**:
-
-**Buyback & Burn:**
-
-- When USDC > 1.35 USDC threshold
-- Swaps excess USDC for tokens on Uniswap
-- Burns tokens to 0xdead address
-- Deflationary tokenomics
-
-**Emergency Minting:**
-
-- When large payout exceeds treasury
-- Mints new tokens
-- Swaps tokens for USDC on Uniswap
-- Ensures winners always get paid
-
-## Running Your Own Slot402
-
-### Prerequisites
-
-- Node.js 18+
-- Yarn
-- Foundry
-- Base RPC URL (Alchemy/Infura)
-- Two wallets:
-  - **Facilitator**: 0.01+ ETH on Base
-  - **Player**: 0.06+ USDC on Base
-
-### Installation
-
-```bash
-git clone https://github.com/scaffold-eth/based-slot.git
-cd based-slot
-yarn install
-```
-
-### Deploy to Base
-
-```bash
-# Deploy contracts
-yarn deploy --network base
-
-# Note the deployed Slot402 contract address
-```
-
-### Activate Slot Machine
-
-1. Open http://localhost:3000/debug
-2. Connect with owner wallet (`0x05937Df8ca0636505d92Fd769d303A3D461587ed`)
-3. Find Slot402 contract
-4. Call `closeTokenSale()` to activate slot machine
-5. Call `addLiquidity()` to create Uniswap pool
-
-### Configure Services
-
-**Frontend** (`packages/nextjs/.env.local`):
-
-```bash
-# x402 Server URL (production)
-NEXT_PUBLIC_X402_SERVER_URL=https://api.slot402.com:8000
-# Or for local development:
-# NEXT_PUBLIC_X402_SERVER_URL=http://localhost:8000
-```
-
-**Facilitator** (`packages/x402-facilitator/.env`):
-
-```bash
-PRIVATE_KEY=0x...
-BASE_RPC_URL=https://base-mainnet.g.alchemy.com/v2/YOUR_KEY
-CHAIN_ID=8453
-PORT=8001
-```
-
-**Server** (`packages/x402-server/.env`):
-
-```bash
-BASE_RPC_URL=https://base-mainnet.g.alchemy.com/v2/YOUR_KEY
-USDC_CONTRACT=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
-FACILITATOR_URL=http://localhost:8001
-CHAIN_ID=8453
-PORT=8000
-```
-
-**Client** (`packages/x402-client/.env`):
-
-```bash
-PRIVATE_KEY=0x...
-BASE_RPC_URL=https://base-mainnet.g.alchemy.com/v2/YOUR_KEY
-USDC_CONTRACT=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
-CHAIN_ID=8453
-```
-
-**Note**: Contract addresses are automatically loaded from Foundry deployment artifacts!
-
-### Start Services
-
-```bash
-# Terminal 1 - Facilitator
-yarn facilitator
-
-# Terminal 2 - Server
-yarn server
-
-# Terminal 3 - Frontend
-yarn start
-
-# Terminal 4 - Test CLI
-yarn client
-```
+---
 
 ## API Documentation
 
@@ -433,6 +547,8 @@ Health check.
 }
 ```
 
+---
+
 ## Architecture
 
 ### System Components
@@ -444,7 +560,7 @@ Health check.
 │  - Pays 0 gas       │
 └──────────┬──────────┘
            │ HTTP + Signatures
-           ↓
+           ▼
 ┌─────────────────────┐      ┌──────────────────────┐
 │  x402 Server        │─────→│  x402 Facilitator    │
 │  - Receives sigs    │      │  - Has ETH for gas   │
@@ -452,13 +568,21 @@ Health check.
 │  - Port 8000        │      │  - Port 8001         │
 └─────────────────────┘      └──────────┬───────────┘
                                         │ On-chain TX
-                                        ↓
+                                        ▼
                              ┌─────────────────────────┐
                              │  Slot402 Contract       │
                              │  - Verifies signatures  │
                              │  - Transfers USDC       │
-                             │  - Stores commit        │
+                             │  - Deposits to vault    │
                              │  - Pays out winners     │
+                             │  - Buyback & burn       │
+                             └────────────┬────────────┘
+                                          │
+                                          ▼
+                             ┌─────────────────────────┐
+                             │  Summer.fi Vault        │
+                             │  - Earns yield on USDC  │
+                             │  - LVUSDC shares        │
                              └─────────────────────────┘
 ```
 
@@ -468,6 +592,7 @@ Health check.
 - **Frontend**: Next.js 14, RainbowKit, Wagmi, Viem, TypeScript
 - **Backend**: Node.js, Express, ethers.js
 - **Payment**: x402 protocol, EIP-3009, EIP-712
+- **DeFi**: Summer.fi FleetCommander (LVUSDC), Uniswap V2
 - **Chain**: Base L2 (Ethereum L2, ~$0.002 gas/tx)
 
 ### Package Structure
@@ -478,7 +603,8 @@ packages/
 │   ├── contracts/
 │   │   ├── Slot402.sol           # Main slot machine
 │   │   ├── Slot402Token.sol      # ERC20 token
-│   │   ├── ManagedTreasury.sol   # Uniswap integration
+│   │   ├── VaultManager.sol      # Summer.fi integration
+│   │   ├── ManagedTreasury.sol   # Uniswap buyback/burn
 │   │   └── SimpleTokenSale.sol   # Token sale
 │   └── script/
 │       └── Deploy.s.sol          # Deployment script
@@ -496,6 +622,93 @@ packages/
 └── x402-client/      # CLI client
     └── client.js                 # Testing tool
 ```
+
+---
+
+## Running Your Own Slot402
+
+### Prerequisites
+
+- Node.js 18+
+- Yarn
+- Foundry
+- Base RPC URL (Alchemy/Infura)
+- Two wallets:
+  - **Facilitator**: 0.01+ ETH on Base
+  - **Player**: 0.06+ USDC on Base
+
+### Installation
+
+```bash
+git clone https://github.com/scaffold-eth/based-slot.git
+cd based-slot
+yarn install
+```
+
+### Deploy to Base
+
+```bash
+# Deploy contracts
+yarn deploy --network base
+
+# Note the deployed Slot402 contract address
+```
+
+### Activate Slot Machine
+
+1. Open http://localhost:3000/debug
+2. Connect with owner wallet (`0x05937Df8ca0636505d92Fd769d303A3D461587ed`)
+3. Find Slot402 contract
+4. Call `closeTokenSale()` to activate slot machine
+5. Call `addLiquidity()` to create Uniswap pool
+
+### Configure Services
+
+**Frontend** (`packages/nextjs/.env.local`):
+
+```bash
+# x402 Server URL (production)
+NEXT_PUBLIC_X402_SERVER_URL=https://api.slot402.com:8000
+# Or for local development:
+# NEXT_PUBLIC_X402_SERVER_URL=http://localhost:8000
+```
+
+**Facilitator** (`packages/x402-facilitator/.env`):
+
+```bash
+PRIVATE_KEY=0x...
+BASE_RPC_URL=https://base-mainnet.g.alchemy.com/v2/YOUR_KEY
+CHAIN_ID=8453
+PORT=8001
+```
+
+**Server** (`packages/x402-server/.env`):
+
+```bash
+BASE_RPC_URL=https://base-mainnet.g.alchemy.com/v2/YOUR_KEY
+USDC_CONTRACT=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+FACILITATOR_URL=http://localhost:8001
+CHAIN_ID=8453
+PORT=8000
+```
+
+### Start Services
+
+```bash
+# Terminal 1 - Facilitator
+yarn facilitator
+
+# Terminal 2 - Server
+yarn server
+
+# Terminal 3 - Frontend
+yarn start
+
+# Terminal 4 - Test CLI
+yarn client
+```
+
+---
 
 ## Security
 
@@ -517,6 +730,8 @@ packages/
 - **Player's secret** prevents house manipulation
 - **Open source** - verify reel configurations on-chain
 - **No admin override** - results are deterministic
+
+---
 
 ## Development
 
@@ -563,6 +778,8 @@ cd packages/foundry
 forge test --match-contract Slot402Test -vvv
 ```
 
+---
+
 ## Troubleshooting
 
 ### "Insufficient USDC balance"
@@ -583,8 +800,6 @@ cast send FACILITATOR_ADDRESS --value 0.01ether \
   --private-key YOUR_KEY --rpc-url base
 ```
 
-Check balance: https://basescan.org/address/FACILITATOR_ADDRESS
-
 ### "FiatTokenV2: invalid signature"
 
 Common causes:
@@ -594,30 +809,18 @@ Common causes:
 - **Nonce already used**: Each EIP-3009 nonce is single-use
 - **Wrong domain**: Ensure using "USD Coin" version "2"
 
-### "Contract not found"
+---
 
-Ensure contracts are deployed:
+## Resources
 
-```bash
-yarn deploy --network base
-```
+- **x402 Protocol**: https://x402.gitbook.io/x402
+- **EIP-3009**: https://eips.ethereum.org/EIPS/eip-3009
+- **EIP-712**: https://eips.ethereum.org/EIPS/eip-712
+- **Summer.fi**: https://summer.fi
+- **Base Network**: https://base.org
+- **Scaffold-ETH**: https://scaffoldeth.io
 
-Check: `packages/foundry/broadcast/Deploy.s.sol/8453/run-latest.json`
-
-### "Server not responding"
-
-Make sure all services are running:
-
-```bash
-# Check facilitator
-curl http://localhost:8001/health
-
-# Check server (production)
-curl https://api.slot402.com:8000/health
-
-# Or locally
-curl http://localhost:8000/health
-```
+---
 
 ## Built with Scaffold-ETH 2
 
@@ -628,44 +831,7 @@ curl http://localhost:8000/health
 
 This project is built with Scaffold-ETH 2, an open-source toolkit for building dApps on Ethereum.
 
-**Features:**
-
-- ✅ **Contract Hot Reload**: Frontend auto-adapts to contract changes
-- 🪝 **Custom hooks**: React hooks around wagmi with TypeScript autocomplete
-- 🧱 **Components**: Common web3 components for quick development
-- 🔥 **Burner Wallet**: Quick testing without real funds
-- 🔐 **Wallet Providers**: RainbowKit integration
-
-### Tech Stack
-
-- **Frontend**: NextJS, RainbowKit, Wagmi, Viem, TypeScript
-- **Contracts**: Foundry (Solidity)
-- **Styling**: Tailwind CSS, DaisyUI
-
-## Resources
-
-- **x402 Protocol**: https://x402.gitbook.io/x402
-- **EIP-3009**: https://eips.ethereum.org/EIPS/eip-3009
-- **EIP-712**: https://eips.ethereum.org/EIPS/eip-712
-- **Base Network**: https://base.org
-- **Scaffold-ETH**: https://scaffoldeth.io
-
-## Future Ideas
-
-- **Batch deposits**: Pre-pay for multiple rolls
-- **Credits system**: Deposit once, play unlimited
-- **NFT rewards**: Collectibles for big wins
-- **Leaderboard**: Track top winners
-- **Multiple bet sizes**: 0.01, 0.05, 0.10, 0.50 USDC
-- **Progressive jackpot**: Accumulating prize pool
-
-## Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-## License
-
-MIT - See LICENSE file
+---
 
 ## Warnings
 
@@ -681,6 +847,8 @@ This is an educational project showcasing:
 - x402 gasless payment protocol
 - EIP-3009 meta-transactions
 - On-chain commit-reveal randomness
+- DeFi yield integration (Summer.fi)
 - Automated treasury management with Uniswap
+- Deflationary tokenomics via buyback & burn
 
 **Play responsibly and understand the risks!**
