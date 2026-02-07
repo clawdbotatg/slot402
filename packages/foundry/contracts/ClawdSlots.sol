@@ -59,8 +59,10 @@ contract ClawdSlots {
     address public constant WETH = 0x4200000000000000000000000000000000000006;
     address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
 
-    // Uniswap V2 Router on Base
-    address public constant UNISWAP_V2_ROUTER = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24;
+    // Uniswap V3 SwapRouter on Base
+    address public constant UNISWAP_V3_ROUTER = 0x2626664c2603336E57B271c5C0b26F421741e481;
+    uint24 public constant USDC_WETH_FEE = 500;     // 0.05% fee tier
+    uint24 public constant WETH_CLAWD_FEE = 10000;  // 1% fee tier
 
     uint256 public constant MAX_BLOCKS_FOR_REVEAL = 256;
 
@@ -146,8 +148,8 @@ contract ClawdSlots {
         hopperBurnThreshold = _hopperBurnThreshold;
         owner = msg.sender;
 
-        // Approve Uniswap router to spend USDC (for swaps)
-        IERC20(USDC).approve(UNISWAP_V2_ROUTER, type(uint256).max);
+        // Approve Uniswap V3 router to spend USDC (for swaps)
+        IERC20(USDC).approve(UNISWAP_V3_ROUTER, type(uint256).max);
 
         // Initialize EIP-712 domain separator
         DOMAIN_SEPARATOR = keccak256(abi.encode(
@@ -502,25 +504,25 @@ contract ClawdSlots {
     // ============ Internal: Swap ============
 
     /**
-     * @dev Swap USDC → WETH → CLAWD via Uniswap V2 multi-hop
+     * @dev Swap USDC → WETH → CLAWD via Uniswap V3 multi-hop
      * @param _usdcAmount Amount of USDC to swap (6 decimals)
      * @return clawdAmount Amount of CLAWD received (18 decimals)
      */
     function _swapUSDCToClawd(uint256 _usdcAmount) internal returns (uint256 clawdAmount) {
-        address[] memory path = new address[](3);
-        path[0] = USDC;
-        path[1] = WETH;
-        path[2] = address(clawdToken);
-
-        uint256[] memory amounts = IUniswapV2Router(UNISWAP_V2_ROUTER).swapExactTokensForTokens(
-            _usdcAmount,
-            1,                        // Accept any amount (slippage handled by small bet size)
-            path,
-            address(this),
-            block.timestamp + 300
+        // V3 path encoding: tokenA (20) + fee (3) + tokenB (20) + fee (3) + tokenC (20)
+        bytes memory path = abi.encodePacked(
+            USDC, USDC_WETH_FEE, WETH, WETH_CLAWD_FEE, address(clawdToken)
         );
 
-        return amounts[amounts.length - 1];
+        // SwapRouter02 ExactInputParams (no deadline field)
+        ISwapRouter.ExactInputParams memory params = ISwapRouter.ExactInputParams({
+            path: path,
+            recipient: address(this),
+            amountIn: _usdcAmount,
+            amountOutMinimum: 1  // Accept any amount (slippage handled by small bet size)
+        });
+
+        return ISwapRouter(UNISWAP_V3_ROUTER).exactInput(params);
     }
 
     // ============ Internal: Hopper ============
@@ -606,12 +608,12 @@ contract ClawdSlots {
 
 // ============ Interfaces ============
 
-interface IUniswapV2Router {
-    function swapExactTokensForTokens(
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    ) external returns (uint256[] memory amounts);
+interface ISwapRouter {
+    struct ExactInputParams {
+        bytes path;
+        address recipient;
+        uint256 amountIn;
+        uint256 amountOutMinimum;
+    }
+    function exactInput(ExactInputParams calldata params) external payable returns (uint256 amountOut);
 }

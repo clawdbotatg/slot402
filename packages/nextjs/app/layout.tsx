@@ -5,8 +5,8 @@ import "~~/styles/globals.css";
 import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 
 export const metadata = getMetadata({
-  title: "Slot402",
-  description: "A decentralized slot machine built on Base",
+  title: "ClawdSlots",
+  description: "A gasless slot machine on Base — every play buys CLAWD! 🦞",
 });
 
 export const viewport = {
