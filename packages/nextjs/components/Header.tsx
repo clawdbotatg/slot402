@@ -13,17 +13,10 @@ export const Header = () => {
   const { targetNetwork } = useTargetNetwork();
   const isLocalNetwork = targetNetwork.id === hardhat.id;
 
-  const { data: currentPhase } = useScaffoldReadContract({
-    contractName: "Slot402",
-    functionName: "currentPhase",
-  });
-
-  const phaseEmoji = currentPhase === 0 ? "🛒" : currentPhase === 1 ? "🎰" : "⚙️";
-
-  // Watch total USDC balance (contract + vault)
-  const { data: totalBalance } = useScaffoldReadContract({
-    contractName: "Slot402",
-    functionName: "getTotalUSDCBalance",
+  // Watch hopper balance (CLAWD in contract)
+  const { data: hopperBalance } = useScaffoldReadContract({
+    contractName: "ClawdSlots",
+    functionName: "getHopperBalance",
     watch: true,
   });
 
@@ -34,14 +27,18 @@ export const Header = () => {
     >
       <div className="navbar-start w-auto lg:w-1/2">
         <Link href="/" passHref className="flex items-center gap-2 ml-4 mr-6 shrink-0">
-          <div className="text-3xl">{phaseEmoji}</div>
+          <div className="text-3xl">🦞</div>
           <div className="flex flex-col">
-            <span className="font-bold leading-tight">Slot402.com</span>
-            <span className="text-xs">Provably fair, co-op-as-the-house, x402 slot machine.</span>
+            <span className="font-bold leading-tight">ClawdSlots</span>
+            <span className="text-xs">Every play buys CLAWD. Gasless x402 slot machine.</span>
           </div>
         </Link>
         <div className="text-lg font-semibold">
-          {totalBalance !== undefined ? <>${(Number(totalBalance) / 1e6).toFixed(6)} USDC</> : <>$0.000000 USDC</>}
+          {hopperBalance !== undefined ? (
+            <>{(Number(hopperBalance) / 1e18).toLocaleString(undefined, { maximumFractionDigits: 0 })} CLAWD</>
+          ) : (
+            <>0 CLAWD</>
+          )}
         </div>
       </div>
       <div className="navbar-end grow mr-4">

@@ -3,7 +3,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   8453: {
     ClawdSlots: {
-      address: "0x69A65d2AfAA057A0F717a3c0B8AEC4D7b31e81Fb",
+      address: "0x35e8E325874E79cE8b7CAcBf29C3a9297713478D",
       abi: [
         {
                 "type": "constructor",
