@@ -1,8 +1,9 @@
 /**
- * x402 Payment Facilitator for Slot402
+ * x402 Payment Facilitator for ClawdSlots
  *
  * This facilitator verifies EIP-712 signatures and settles payments on-chain
- * using EIP-3009 transferWithAuthorization for USDC transfers
+ * using EIP-3009 transferWithAuthorization for USDC transfers.
+ * Payouts are in CLAWD tokens (swapped from USDC on-chain).
  */
 
 const express = require("express");
@@ -188,23 +189,24 @@ if (broadcast.transactions) {
 
 console.log(`📋 Deployed contracts:`, Object.keys(deployedContracts));
 
-// Get Slot402 contract address
-if (!deployedContracts.Slot402) {
-  console.error(`❌ Slot402 contract not found in deployment`);
+// Get ClawdSlots contract address (fallback to Slot402 for backwards compat)
+const contractEntry = deployedContracts.ClawdSlots || deployedContracts.Slot402;
+if (!contractEntry) {
+  console.error(`❌ ClawdSlots contract not found in deployment`);
   console.error(`   Available contracts:`, Object.keys(deployedContracts));
-  console.error(`   Deploy Slot402 first: yarn deploy`);
+  console.error(`   Deploy ClawdSlots first: yarn deploy`);
   process.exit(1);
 }
 
-const RUGSLOT_CONTRACT = deployedContracts.Slot402.address;
+const RUGSLOT_CONTRACT = contractEntry.address;
 console.log(
-  `✅ Loaded Slot402 contract: ${RUGSLOT_CONTRACT} (chain ${CHAIN_ID})`
+  `✅ Loaded ClawdSlots contract: ${RUGSLOT_CONTRACT} (chain ${CHAIN_ID})`
 );
 
 console.log(`💼 Facilitator Configuration:
   Wallet: ${wallet.address}
   Network: Base (Chain ID: ${CHAIN_ID})
-  Slot402 Contract: ${RUGSLOT_CONTRACT}
+  ClawdSlots Contract: ${RUGSLOT_CONTRACT}
   Port: ${PORT}
 `);
 
@@ -214,12 +216,12 @@ const TRANSFER_WITH_AUTHORIZATION_ABI = [
   "function authorizationState(address authorizer, bytes32 nonce) external view returns (bool)",
 ];
 
-// Slot402 contract ABI
+// ClawdSlots contract ABI
 const RUGSLOT_ABI = [
   "function commitWithMetaTransaction(address _player, bytes32 _commitHash, uint256 _nonce, uint256 _deadline, bytes _signature, address _facilitatorAddress, tuple(address from, address to, uint256 value, uint256 validAfter, uint256 validBefore, bytes32 nonce) _usdcAuth, bytes _usdcSignature) external returns (uint256)",
   "function commitCount(address) external view returns (uint256)",
   "function revealAndCollectFor(address _player, uint256 _commitId, uint256 _secret) external",
-  "function commits(address, uint256) external view returns (bytes32 commitHash, uint256 commitBlock, uint256 amountWon, uint256 amountPaid, bool revealed)",
+  "function commits(address, uint256) external view returns (bytes32 commitHash, uint256 commitBlock, uint256 clawdBet, uint256 amountWon, uint256 amountPaid, bool revealed)",
 ];
 
 // Uniswap V2 Router ABI (for swapping USDC to ETH)
@@ -847,11 +849,12 @@ app.post("/claim", async (req, res) => {
           });
 
           // Check if payment is complete
+          // ClawdSlots commit struct: (commitHash, commitBlock, clawdBet, amountWon, amountPaid, revealed)
           const commitData = await rugSlotContract.commits(
             player,
             BigInt(commitId)
           );
-          const [, , amountWon, amountPaid] = commitData;
+          const [, , , amountWon, amountPaid] = commitData;
 
           console.log(`   Amount won: ${amountWon.toString()}`);
           console.log(`   Amount paid: ${amountPaid.toString()}`);

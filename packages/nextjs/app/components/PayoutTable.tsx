@@ -10,8 +10,6 @@ interface PayoutRow {
 }
 
 export const PayoutTable = () => {
-  const BET_SIZE_USDC = 0.05; // 0.05 USDC
-
   const payouts: PayoutRow[] = [
     {
       symbol: "BASEETH",
@@ -44,14 +42,14 @@ export const PayoutTable = () => {
       description: "3× Bell",
     },
     {
-      symbol: "STAR",
-      symbolImage: "/slot/star.png",
+      symbol: "CLAW",
+      symbolImage: "/slot/star.png", // Using star.png until lobster claw art is ready
       multiplier: 41,
-      description: "3× Star",
+      description: "3× Claw 🦞",
     },
     {
       symbol: "ANYBAR",
-      symbolImage: "/slot/bar.png", // We'll show both bar symbols
+      symbolImage: "/slot/bar.png",
       multiplier: 35,
       description: "Any Bar Combo",
     },
@@ -81,7 +79,7 @@ export const PayoutTable = () => {
         className="text-2xl font-bold text-center mb-6 text-white"
         style={{ textShadow: "2px 2px 4px rgba(0,0,0,0.5)" }}
       >
-        💰 PAYOUT TABLE 💰
+        🦞 PAYOUT TABLE — Win CLAWD! 🦞
       </h2>
 
       <div className="overflow-x-auto">
@@ -95,8 +93,6 @@ export const PayoutTable = () => {
           </thead>
           <tbody>
             {payouts.map((payout, index) => {
-              const payoutAmountUsdc = BET_SIZE_USDC * payout.multiplier;
-              const payoutAmountFormatted = payoutAmountUsdc.toFixed(2);
               const isSpecial = payout.symbol === "BASEETH" || payout.symbol === "SEVEN";
               const rowColor = index % 2 === 0 ? "#3a6b78" : "#2d5a66";
 
@@ -155,7 +151,7 @@ export const PayoutTable = () => {
                   </td>
                   <td className="p-3 text-right border-2 border-black">
                     <div className="flex flex-col items-end">
-                      <span className="text-green-300 font-bold text-lg">${payoutAmountFormatted} USDC</span>
+                      <span className="text-green-300 font-bold text-lg">{payout.multiplier}× your CLAWD</span>
                     </div>
                   </td>
                 </tr>
@@ -166,10 +162,13 @@ export const PayoutTable = () => {
       </div>
 
       <div className="mt-4 text-center text-sm text-gray-300">
-        <p>Bet Size: ${BET_SIZE_USDC} USDC per spin</p>
+        <p>Your USDC buys CLAWD on Uniswap → wins pay in CLAWD</p>
         <p className="mt-1">
           <span className="text-yellow-300">⚡</span> Any Bar Combo = Any mix of BAR and DOUBLE BAR{" "}
           <span className="text-yellow-300">⚡</span>
+        </p>
+        <p className="mt-1 text-xs opacity-60">
+          🔥 Hopper overflow (above 2× jackpot) gets burned to 0xdead — deflationary!
         </p>
       </div>
     </div>

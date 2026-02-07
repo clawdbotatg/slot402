@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { parseEther } from "viem";
-import { Address } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
 interface OwnerControlsProps {
@@ -8,197 +6,91 @@ interface OwnerControlsProps {
 }
 
 export function OwnerControls({ connectedAddress }: OwnerControlsProps) {
-  const { writeContractAsync: writeAddLiquidity } = useScaffoldWriteContract("Slot402");
-  const { writeContractAsync: writeRemoveLiquidity } = useScaffoldWriteContract("Slot402");
-  const { writeContractAsync: writeRug } = useScaffoldWriteContract("Slot402");
-  const { writeContractAsync: writeRugMint } = useScaffoldWriteContract("Slot402");
-  const { writeContractAsync: writeAdminSwapUSDCForTokens } = useScaffoldWriteContract("Slot402");
-  const { writeContractAsync: writeAdminSwapTokensForUSDC } = useScaffoldWriteContract("Slot402");
+  const { writeContractAsync: writeTransferOwnership } = useScaffoldWriteContract("ClawdSlots");
+  const { writeContractAsync: writeRenounceOwnership } = useScaffoldWriteContract("ClawdSlots");
 
-  // Read liquidity status from contract
-  const { data: liquidityAdded } = useScaffoldReadContract({
-    contractName: "Slot402",
-    functionName: "liquidityAdded",
+  // Read owner from contract
+  const { data: contractOwner } = useScaffoldReadContract({
+    contractName: "ClawdSlots",
+    functionName: "owner",
   });
 
-  const { data: uniswapPair } = useScaffoldReadContract({
-    contractName: "Slot402",
-    functionName: "uniswapPair",
+  // Read hopper balance
+  const { data: hopperBalance } = useScaffoldReadContract({
+    contractName: "ClawdSlots",
+    functionName: "getHopperBalance",
+    watch: true,
   });
 
-  const [swapUsdcAmount, setSwapUsdcAmount] = useState("50");
-  const [swapTokenAmount, setSwapTokenAmount] = useState("0.1");
+  const [newOwner, setNewOwner] = useState("");
 
-  const handleAddLiquidity = async () => {
-    try {
-      console.log("Adding liquidity...");
-      await writeAddLiquidity({
-        functionName: "addLiquidity",
-      });
-      console.log("Liquidity added successfully! 🎉");
-    } catch (e) {
-      console.error("Error adding liquidity:", e);
-    }
-  };
-
-  const handleRemoveLiquidity = async () => {
-    try {
-      console.log("Removing liquidity...");
-      await writeRemoveLiquidity({
-        functionName: "removeLiquidity",
-      });
-      console.log("Liquidity removed successfully! 🎉");
-    } catch (e) {
-      console.error("Error removing liquidity:", e);
-    }
-  };
-
-  const handleRug = async () => {
-    try {
-      console.log("Rugging...");
-      await writeRug({
-        functionName: "rug",
-      });
-      console.log("Rug successful! 💰");
-    } catch (e) {
-      console.error("Error rugging:", e);
-    }
-  };
-
-  const handleRugMint = async () => {
-    try {
-      console.log("Rug minting...");
-      await writeRugMint({
-        functionName: "rugmint",
-      });
-      console.log("Minted 1 token to owner!");
-    } catch (e) {
-      console.error("Error rug minting:", e);
-    }
-  };
-
-  const handleAdminSwapUSDCForTokens = async () => {
-    try {
-      // USDC has 6 decimals, so we need to convert the amount
-      const usdcAmount = BigInt(Math.floor(parseFloat(swapUsdcAmount) * 1e6));
-      console.log(`Swapping ${swapUsdcAmount} USDC for tokens...`);
-      await writeAdminSwapUSDCForTokens({
-        functionName: "adminSwapUSDCForTokens",
-        args: [usdcAmount],
-      });
-      console.log("Swap successful! Check transaction for token amount received 🎉");
-    } catch (e) {
-      console.error("Error swapping USDC for tokens:", e);
-    }
-  };
-
-  const handleAdminSwapTokensForUSDC = async () => {
-    try {
-      console.log(`Swapping ${swapTokenAmount} tokens for USDC...`);
-      await writeAdminSwapTokensForUSDC({
-        functionName: "adminSwapTokensForUSDC",
-        args: [parseEther(swapTokenAmount)],
-      });
-      console.log("Swap successful! Check transaction for USDC amount received 🎉");
-    } catch (e) {
-      console.error("Error swapping tokens for USDC:", e);
-    }
-  };
-
-  // Only show if connected address is owner
-  if (connectedAddress?.toLowerCase() !== "0x05937Df8ca0636505d92Fd769d303A3D461587ed".toLowerCase()) {
+  // Only show if connected address is the owner
+  if (!connectedAddress || !contractOwner || connectedAddress.toLowerCase() !== contractOwner.toLowerCase()) {
     return null;
   }
 
   return (
     <div className="bg-warning rounded-lg p-6 mt-6">
-      <h2 className="text-2xl font-semibold mb-4">👑 Owner Controls</h2>
-      <p className="mb-4">You are the owner!</p>
+      <h2 className="text-2xl font-semibold mb-4">🦞 Owner Controls</h2>
+      <p className="mb-4">You are the owner of ClawdSlots!</p>
 
-      {/* Liquidity Status */}
+      {/* Hopper Info */}
       <div className="mb-4 p-3 bg-base-100 rounded-lg">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="font-semibold">Liquidity Status:</span>
-          {liquidityAdded ? (
-            <span className="badge badge-success">✅ Added</span>
-          ) : (
-            <span className="badge badge-error">❌ Not Added (Buyback Disabled!)</span>
-          )}
+        <div className="flex items-center gap-2">
+          <span className="font-semibold">Hopper Balance:</span>
+          <span className="text-green-600 font-bold">
+            {hopperBalance ? (Number(hopperBalance) / 1e18).toLocaleString(undefined, { maximumFractionDigits: 0 }) : "0"} CLAWD
+          </span>
         </div>
-        {uniswapPair && uniswapPair !== "0x0000000000000000000000000000000000000000" && (
-          <div className="text-sm">
-            <span className="opacity-70">Uniswap Pair: </span>
-            <Address address={uniswapPair} />
-          </div>
-        )}
       </div>
 
-      {/* Liquidity Controls */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-2">Liquidity</h3>
+      {/* Transfer Ownership */}
+      <div className="mb-4">
+        <h3 className="text-lg font-semibold mb-2">Transfer Ownership</h3>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="0x... new owner address"
+            className="input input-bordered flex-1"
+            value={newOwner}
+            onChange={e => setNewOwner(e.target.value)}
+          />
+          <button
+            className="btn btn-primary"
+            onClick={async () => {
+              try {
+                await writeTransferOwnership({
+                  functionName: "transferOwnership",
+                  args: [newOwner as `0x${string}`],
+                });
+                console.log("Ownership transferred!");
+              } catch (e) {
+                console.error("Error:", e);
+              }
+            }}
+          >
+            Transfer
+          </button>
+        </div>
+      </div>
+
+      {/* Danger Zone */}
+      <div className="mt-4 p-3 bg-error bg-opacity-20 rounded-lg">
+        <h3 className="text-lg font-semibold mb-2">⚠️ Danger Zone</h3>
         <div className="flex gap-2 flex-wrap">
-          <button className="btn btn-error" onClick={handleAddLiquidity}>
-            Add Liquidity (3.65 USDC + 3650 tokens)
-          </button>
-          <button className="btn btn-error" onClick={handleRemoveLiquidity}>
-            Remove Liquidity
-          </button>
-        </div>
-      </div>
-
-      {/* Test Swap Controls */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-2">Test Swaps (Debug)</h3>
-        <div className="flex gap-4 flex-wrap items-end">
-          {/* Swap USDC for Tokens */}
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text">USDC Amount (6 decimals)</span>
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="50"
-                className="input input-bordered w-32"
-                value={swapUsdcAmount}
-                onChange={e => setSwapUsdcAmount(e.target.value)}
-              />
-              <button className="btn btn-primary" onClick={handleAdminSwapUSDCForTokens}>
-                Swap USDC → Tokens
-              </button>
-            </div>
-          </div>
-
-          {/* Swap Tokens for USDC */}
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text">Token Amount</span>
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="0.1"
-                className="input input-bordered w-32"
-                value={swapTokenAmount}
-                onChange={e => setSwapTokenAmount(e.target.value)}
-              />
-              <button className="btn btn-primary" onClick={handleAdminSwapTokensForUSDC}>
-                Swap Tokens → USDC
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Rug Controls */}
-      <div>
-        <h3 className="text-lg font-semibold mb-2">Rug Functions</h3>
-        <div className="flex gap-2 flex-wrap">
-          <button className="btn btn-error" onClick={handleRug}>
-            Rug (Withdraw All USDC)
-          </button>
-          <button className="btn btn-error" onClick={handleRugMint}>
-            RugMint (Mint 1 Token to Owner)
+          <button
+            className="btn btn-error btn-sm"
+            onClick={async () => {
+              if (!confirm("Are you sure? This will renounce ownership permanently!")) return;
+              try {
+                await writeRenounceOwnership({ functionName: "renounceOwnership" });
+                console.log("Ownership renounced!");
+              } catch (e) {
+                console.error("Error:", e);
+              }
+            }}
+          >
+            Renounce Ownership
           </button>
         </div>
       </div>

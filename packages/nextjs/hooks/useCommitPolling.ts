@@ -48,18 +48,19 @@ export function useCommitPolling({
 
       try {
         const chainId = targetNetworkId as keyof typeof deployedContracts;
-        const contractAddress = (deployedContracts as any)[chainId]?.Slot402?.address;
-        const contractABI = (deployedContracts as any)[chainId]?.Slot402?.abi;
+        const contractAddress = (deployedContracts as any)[chainId]?.ClawdSlots?.address;
+        const contractABI = (deployedContracts as any)[chainId]?.ClawdSlots?.abi;
 
         if (!contractAddress || !contractABI) return false;
 
         // First, validate the commit exists on-chain
+        // ClawdSlots commit struct: (commitHash, commitBlock, clawdBet, amountWon, amountPaid, revealed)
         const commitDataResult = (await publicClient.readContract({
           address: contractAddress as `0x${string}`,
           abi: contractABI,
           functionName: "commits",
           args: [connectedAddress as `0x${string}`, commitId],
-        })) as [string, bigint, bigint, bigint, boolean];
+        })) as [string, bigint, bigint, bigint, bigint, boolean];
 
         const commitBlock = commitDataResult[1];
 
@@ -111,13 +112,13 @@ export function useCommitPolling({
         onResult(won, encodedResult);
         onStopPolling();
 
-        // If winner, add to pending reveals array
+        // If winner, add to pending reveals array (payout is in CLAWD)
         if (won && onAddReveal && payout > 0n) {
           const newReveal = {
             commitId: commitId.toString(),
             secret: secret,
-            commitBlock: commitDataResult[1],
-            amountWon: payout,
+            commitBlock: commitDataResult[1], // commitBlock
+            amountWon: payout, // CLAWD amount
             amountPaid: 0n,
           };
           onAddReveal(newReveal);

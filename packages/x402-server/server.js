@@ -1,7 +1,8 @@
 /**
- * x402 Server for Slot402
+ * x402 Server for ClawdSlots
  *
  * Handles gasless slot machine rolls using x402 payment protocol
+ * Every play buys CLAWD, payouts in CLAWD, hopper overflow burns CLAWD
  * Server commits on behalf of user, polls for result, returns reel positions
  */
 
@@ -86,17 +87,18 @@ if (broadcast.transactions) {
 
 console.log(`📋 Deployed contracts:`, Object.keys(deployedContracts));
 
-// Get Slot402 contract address
-if (!deployedContracts.Slot402) {
-  console.error(`❌ Slot402 contract not found in deployment`);
+// Get ClawdSlots contract address (fallback to Slot402 for backwards compat)
+const contractEntry = deployedContracts.ClawdSlots || deployedContracts.Slot402;
+if (!contractEntry) {
+  console.error(`❌ ClawdSlots contract not found in deployment`);
   console.error(`   Available contracts:`, Object.keys(deployedContracts));
-  console.error(`   Deploy Slot402 first: yarn deploy`);
+  console.error(`   Deploy ClawdSlots first: yarn deploy`);
   process.exit(1);
 }
 
-const RUGSLOT_CONTRACT = deployedContracts.Slot402.address;
+const RUGSLOT_CONTRACT = contractEntry.address;
 console.log(
-  `✅ Loaded Slot402 contract: ${RUGSLOT_CONTRACT} (chain ${CHAIN_ID})`
+  `✅ Loaded ClawdSlots contract: ${RUGSLOT_CONTRACT} (chain ${CHAIN_ID})`
 );
 
 // Initialize provider
@@ -108,7 +110,7 @@ const BLOCK_MINER_KEY =
 const blockMinerWallet = new ethers.Wallet(BLOCK_MINER_KEY, provider);
 
 console.log(`💼 Server Configuration:
-  Slot402 Contract: ${RUGSLOT_CONTRACT}
+  ClawdSlots Contract: ${RUGSLOT_CONTRACT}
   Chain ID: ${CHAIN_ID}
   USDC: ${USDC_CONTRACT}
   RPC: ${BASE_RPC_URL}
@@ -116,26 +118,30 @@ console.log(`💼 Server Configuration:
   Port: ${PORT}
 `);
 
-// Minimal Slot402 ABI for the functions we need
+// ClawdSlots ABI for the functions we need
 const RUGSLOT_ABI = [
   "function commitWithMetaTransaction(address _player, bytes32 _commitHash, uint256 _nonce, uint256 _deadline, bytes _signature, address _facilitatorAddress, tuple(address from, address to, uint256 value, uint256 validAfter, uint256 validBefore, bytes32 nonce) _usdcAuth, bytes _usdcSignature) external returns (uint256)",
   "function getCommitHash(uint256 _secret) external pure returns (bytes32)",
   "function isWinner(address _player, uint256 _commitId, uint256 _secret) external view returns (bool won, uint256 reel1Pos, uint256 reel2Pos, uint256 reel3Pos, uint256 payout)",
-  "function commits(address, uint256) external view returns (bytes32 commitHash, uint256 commitBlock, uint256 amountWon, uint256 amountPaid, bool revealed)",
+  "function commits(address, uint256) external view returns (bytes32 commitHash, uint256 commitBlock, uint256 clawdBet, uint256 amountWon, uint256 amountPaid, bool revealed)",
   "function nonces(address) external view returns (uint256)",
   "function DOMAIN_SEPARATOR() external view returns (bytes32)",
   "function META_COMMIT_TYPEHASH() external view returns (bytes32)",
   "function getReel1() external view returns (uint8[45])",
   "function getReel2() external view returns (uint8[45])",
   "function getReel3() external view returns (uint8[45])",
+  "function totalBet() external view returns (uint256)",
+  "function betSize() external view returns (uint256)",
+  "function facilitatorFee() external view returns (uint256)",
+  "function getHopperBalance() external view returns (uint256)",
 ];
 
-// Symbol enum mapping
+// Symbol enum mapping (STAR → CLAW in ClawdSlots)
 const SYMBOL_NAMES = [
   "CHERRIES",
   "ORANGE",
   "WATERMELON",
-  "STAR",
+  "CLAW",
   "BELL",
   "BAR",
   "DOUBLEBAR",
@@ -205,12 +211,17 @@ class SimpleFacilitator {
 
 const facilitator = new SimpleFacilitator(FACILITATOR_URL);
 
+// Contract config (loaded from chain at startup)
+let contractTotalBet = 0n;
+let contractBetSize = 0n;
+let contractFacilitatorFee = 0n;
+
 /**
- * Load reel configurations from contract at startup
+ * Load reel configurations and contract config from chain at startup
  */
 async function loadReels() {
   try {
-    console.log("🎰 Loading reel configurations from contract...");
+    console.log("🎰 Loading reel configurations and config from contract...");
     const contract = new ethers.Contract(
       RUGSLOT_CONTRACT,
       RUGSLOT_ABI,
@@ -221,23 +232,33 @@ async function loadReels() {
     reel2Symbols = await contract.getReel2();
     reel3Symbols = await contract.getReel3();
 
+    // Load pricing from contract
+    contractTotalBet = await contract.totalBet();
+    contractBetSize = await contract.betSize();
+    contractFacilitatorFee = await contract.facilitatorFee();
+
     console.log(`✅ Loaded ${reel1Symbols.length} symbols for each reel`);
     console.log(
       `   Reel 1 sample: ${SYMBOL_NAMES[reel1Symbols[0]]}, ${
         SYMBOL_NAMES[reel1Symbols[1]]
       }, ${SYMBOL_NAMES[reel1Symbols[2]]}...`
     );
+    console.log(`💰 Contract pricing:`);
+    console.log(`   Total bet: ${contractTotalBet} (${Number(contractTotalBet) / 1e6} USDC)`);
+    console.log(`   Bet size: ${contractBetSize} (${Number(contractBetSize) / 1e6} USDC)`);
+    console.log(`   Facilitator fee: ${contractFacilitatorFee} (${Number(contractFacilitatorFee) / 1e6} USDC)`);
   } catch (error) {
-    console.error("❌ Failed to load reels:", error.message);
-    console.error("   Server will continue but symbol display will not work");
+    console.error("❌ Failed to load reels/config:", error.message);
+    console.error("   Server will continue but may not work correctly");
   }
 }
 
 /**
- * Mine a new block on local fork (only for CHAIN_ID 31337)
+ * Mine a new block on local fork (when RPC is localhost)
  */
 async function mineBlockOnLocalFork() {
-  if (CHAIN_ID !== "31337") {
+  const isLocalhost = BASE_RPC_URL.includes("127.0.0.1") || BASE_RPC_URL.includes("localhost");
+  if (!isLocalhost) {
     return; // Only mine blocks on local fork
   }
 
@@ -344,16 +365,22 @@ app.post("/roll", async (req, res) => {
       .toString(36)
       .substring(7)}`;
 
-    // Create payment requirements (payTo will be the Slot402 contract)
+    // Create payment requirements (payTo will be the ClawdSlots contract)
     // Note: On fork (CHAIN_ID 31337), we need to use Base mainnet chainId (8453) for USDC domain
     const usdcChainId = CHAIN_ID === "31337" ? "8453" : CHAIN_ID;
 
+    // Use contract-sourced pricing
+    const totalBetAtomic = contractTotalBet.toString();
+    const totalBetUsdc = Number(contractTotalBet) / 1e6;
+    const betSizeUsdc = Number(contractBetSize) / 1e6;
+    const feeUsdc = Number(contractFacilitatorFee) / 1e6;
+
     const requirements = await createPaymentRequirements({
-      price: 0.06, // $0.06 USDC (0.05 bet + 0.01 facilitator fee)
+      price: totalBetUsdc,
       payToAddress: RUGSLOT_CONTRACT,
       resource: `/roll/${requestId}`,
       network: "base",
-      description: "Slot402 x402 Roll - Gasless slot machine spin",
+      description: "ClawdSlots x402 Roll - Every play buys CLAWD!",
       mimeType: "application/json",
       scheme: "exact",
       maxTimeoutSeconds: 600,
@@ -363,8 +390,8 @@ app.post("/roll", async (req, res) => {
         chainId: usdcChainId, // Pass correct chainId for USDC domain
         requestId,
         player,
-        betSize: "0.05",
-        facilitatorFee: "0.01",
+        betSize: betSizeUsdc.toString(),
+        facilitatorFee: feeUsdc.toString(),
       },
     });
 
@@ -376,7 +403,7 @@ app.post("/roll", async (req, res) => {
     });
 
     console.log(`📋 Created request ${requestId}`);
-    console.log(`   Price: $0.06 USDC`);
+    console.log(`   Price: $${totalBetUsdc} USDC`);
 
     // Return 402 Payment Required
     return res.status(402).json({
@@ -385,10 +412,10 @@ app.post("/roll", async (req, res) => {
       accepts: [requirements],
       requestId,
       pricing: {
-        total: "$0.06 USDC",
-        betSize: "$0.05 USDC",
-        facilitatorFee: "$0.01 USDC",
-        atomicUnits: "60000",
+        total: `$${totalBetUsdc} USDC`,
+        betSize: `$${betSizeUsdc} USDC (→ CLAWD)`,
+        facilitatorFee: `$${feeUsdc} USDC`,
+        atomicUnits: totalBetAtomic,
       },
     });
   } catch (error) {
@@ -513,10 +540,10 @@ app.post("/roll/submit", async (req, res) => {
     );
     console.log(`   Payout: ${result.payout}`);
 
-    // If player won, automatically claim their winnings
+    // If player won, automatically claim their winnings (pays CLAWD)
     let claimTransaction = null;
     if (result.won) {
-      console.log(`\n🎁 Player won! Auto-claiming winnings...`);
+      console.log(`\n🎁 Player won! Auto-claiming CLAWD winnings...`);
       try {
         const claimResponse = await facilitator.claim(
           player,
@@ -526,7 +553,7 @@ app.post("/roll/submit", async (req, res) => {
 
         if (claimResponse.success) {
           const claimTxHash = claimResponse.transactions?.[0]?.hash;
-          console.log(`✅ Winnings claimed and sent to player!`);
+          console.log(`✅ CLAWD winnings claimed and sent to player!`);
           console.log(`   Claim TX: ${claimTxHash}`);
           claimTransaction = claimTxHash;
         } else {
@@ -545,6 +572,10 @@ app.post("/roll/submit", async (req, res) => {
     // Clean up pending request
     pendingRequests.delete(requestId);
 
+    // Format CLAWD payout (18 decimals)
+    const payoutClawd = result.payout;
+    const payoutClawdFormatted = (Number(payoutClawd) / 1e18).toFixed(2);
+
     // Return result to client
     return res.status(200).json({
       success: true,
@@ -562,7 +593,9 @@ app.post("/roll/submit", async (req, res) => {
           reel3: result.reel3,
         },
         symbols: result.symbols,
-        payout: result.payout,
+        payout: result.payout,            // Raw CLAWD amount (18 decimals string)
+        payoutFormatted: payoutClawdFormatted, // Human-readable CLAWD
+        payoutToken: "CLAWD",
         claimTransaction: claimTransaction,
       },
     });

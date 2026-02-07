@@ -2,24 +2,15 @@
 pragma solidity ^0.8.19;
 
 import "./DeployHelpers.s.sol";
-import { DeploySlot402 } from "./DeploySlot402.s.sol";
+import { DeployClawdSlots } from "./DeployClawdSlots.s.sol";
 
 /**
- * @notice Main deployment script for all contracts
- * @dev Run this when you want to deploy multiple contracts at once
- *
- * Example: yarn deploy # runs this script(without`--file` flag)
+ * @notice Main deployment script
+ * @dev Run: yarn deploy
  */
 contract DeployScript is ScaffoldETHDeploy {
     function run() external {
-        // Deploys all your contracts sequentially
-        // Add new deployments here when needed
-
-        DeploySlot402 deploySlot402 = new DeploySlot402();
-        deploySlot402.run();
-
-        // Deploy another contract
-        // DeployMyContract myContract = new DeployMyContract();
-        // myContract.run();
+        DeployClawdSlots deployClawdSlots = new DeployClawdSlots();
+        deployClawdSlots.run();
     }
 }
