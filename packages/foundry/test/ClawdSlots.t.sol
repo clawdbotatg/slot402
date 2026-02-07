@@ -43,7 +43,8 @@ contract ClawdSlotsTest is Test {
             CLAWD_ADDR,
             testBetSize,
             testFacilitatorFee,
-            testHopperThreshold
+            testHopperThreshold,
+            490_000 * 10**18  // minHopperBalance
         );
         
         // Fund player with USDC from whale
@@ -85,7 +86,7 @@ contract ClawdSlotsTest is Test {
     
     function test_CanAcceptRoll_EmptyHopper() public view {
         // Can't accept roll with empty hopper
-        assertFalse(slots.canAcceptRoll(1 ether));
+        assertFalse(slots.canAcceptRoll());
     }
     
     function test_GetCommitHash() public view {
@@ -230,7 +231,7 @@ contract ClawdSlotsTest is Test {
         uint256 needed = estimatedClawdBet * 8839; // jackpot worth
         _seedHopper(needed + 1);
         
-        assertTrue(slots.canAcceptRoll(estimatedClawdBet));
+        assertTrue(slots.canAcceptRoll());
     }
     
     // ============ EIP-712 Tests ============

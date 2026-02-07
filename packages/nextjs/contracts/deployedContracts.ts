@@ -3,7 +3,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   8453: {
     ClawdSlots: {
-      address: "0x35e8E325874E79cE8b7CAcBf29C3a9297713478D",
+      address: "0x7e34d120d50127D39ed29033E286d5F43Ecd4782",
       abi: [
         {
                 "type": "constructor",
@@ -25,6 +25,11 @@ const deployedContracts = {
                         },
                         {
                                 "name": "_hopperBurnThreshold",
+                                "type": "uint256",
+                                "internalType": "uint256"
+                        },
+                        {
+                                "name": "_minHopperBalance",
                                 "type": "uint256",
                                 "internalType": "uint256"
                         }
@@ -372,13 +377,7 @@ const deployedContracts = {
         {
                 "type": "function",
                 "name": "canAcceptRoll",
-                "inputs": [
-                        {
-                                "name": "_estimatedClawdBet",
-                                "type": "uint256",
-                                "internalType": "uint256"
-                        }
-                ],
+                "inputs": [],
                 "outputs": [
                         {
                                 "name": "",
@@ -789,6 +788,19 @@ const deployedContracts = {
                         },
                         {
                                 "name": "payout",
+                                "type": "uint256",
+                                "internalType": "uint256"
+                        }
+                ],
+                "stateMutability": "view"
+        },
+        {
+                "type": "function",
+                "name": "minHopperBalance",
+                "inputs": [],
+                "outputs": [
+                        {
+                                "name": "",
                                 "type": "uint256",
                                 "internalType": "uint256"
                         }

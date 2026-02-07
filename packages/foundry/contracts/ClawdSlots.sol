@@ -93,6 +93,7 @@ contract ClawdSlots {
     uint256 public immutable facilitatorFee;     // USDC to facilitator (e.g., 10000 = $0.01)
     uint256 public immutable totalBet;           // betSize + facilitatorFee
     uint256 public immutable hopperBurnThreshold; // Burn CLAWD above this amount
+    uint256 public immutable minHopperBalance;    // Minimum CLAWD to accept rolls
 
     // ============ Reel Configurations ============
     // Each reel has 45 symbols: 9C, 8O, 7W, 6Claw, 5B, 4Bar, 3DBar, 2Seven, 1BaseETH
@@ -136,7 +137,8 @@ contract ClawdSlots {
         address _clawdToken,
         uint256 _betSize,
         uint256 _facilitatorFee,
-        uint256 _hopperBurnThreshold
+        uint256 _hopperBurnThreshold,
+        uint256 _minHopperBalance
     ) {
         require(_clawdToken != address(0), "Invalid CLAWD address");
         require(_betSize > 0, "Invalid bet size");
@@ -146,6 +148,7 @@ contract ClawdSlots {
         facilitatorFee = _facilitatorFee;
         totalBet = _betSize + _facilitatorFee;
         hopperBurnThreshold = _hopperBurnThreshold;
+        minHopperBalance = _minHopperBalance;
         owner = msg.sender;
 
         // Approve Uniswap V3 router to spend USDC (for swaps)
@@ -405,11 +408,10 @@ contract ClawdSlots {
 
     /**
      * @notice Can the machine accept a roll right now?
-     * @param _estimatedClawdBet Estimated CLAWD from swapping betSize USDC
-     * @return True if hopper can cover a jackpot
+     * @return Whether the hopper has enough CLAWD to accept rolls
      */
-    function canAcceptRoll(uint256 _estimatedClawdBet) external view returns (bool) {
-        return clawdToken.balanceOf(address(this)) >= _estimatedClawdBet * MAX_MULTIPLIER;
+    function canAcceptRoll() external view returns (bool) {
+        return clawdToken.balanceOf(address(this)) >= minHopperBalance;
     }
 
     /**

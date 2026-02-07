@@ -23,6 +23,8 @@ contract DeployClawdSlots is ScaffoldETHDeploy {
         uint256 testFacilitatorFee = 1000; // 0.001 USDC
         // Hopper burn threshold: 10M CLAWD (small for testing — production would be ~2 jackpots)
         uint256 testHopperBurnThreshold = 10_000_000 * 10**18;
+        // Min hopper balance to accept rolls: 490K CLAWD (so 500K deposit is enough)
+        uint256 testMinHopperBalance = 490_000 * 10**18;
 
         // ===== PRODUCTION AMOUNTS (uncomment when ready) =====
         // uint256 prodBetSize = 240000;        // 0.24 USDC
@@ -33,7 +35,8 @@ contract DeployClawdSlots is ScaffoldETHDeploy {
             CLAWD_TOKEN,
             testBetSize,
             testFacilitatorFee,
-            testHopperBurnThreshold
+            testHopperBurnThreshold,
+            testMinHopperBalance
         );
 
         console.log("ClawdSlots deployed at:", address(clawdSlots));
