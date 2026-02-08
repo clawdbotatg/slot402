@@ -25,3 +25,7 @@ dist
 # SSL certificates
 packages/x402-server/server.cert
 packages/x402-server/server.key
+# Environment files
+.env
+.env.local
+.env.production
