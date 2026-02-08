@@ -2,8 +2,6 @@
 
 > Every play buys CLAWD. Payouts in CLAWD. Overflow gets burned. 🔥
 
-**Live at**: [https://slot402.com](https://slot402.com)
-
 A **fully gasless** on-chain slot machine where every spin swaps USDC → CLAWD via Uniswap V3, fills the hopper, and pays winners in CLAWD tokens. Hopper overflow above the burn threshold gets sent to the dead address.
 
 - **Fully x402 compliant** — Pay with signatures, not gas
