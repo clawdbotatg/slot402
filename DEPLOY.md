@@ -1,3 +1,88 @@
+# Slot402 Deployment Guide
+
+---
+
+## Local Development (Anvil Fork)
+
+### Quick Start
+
+```bash
+cd slot402
+
+# 1. Start Anvil fork of Base (MUST use --chain-id 8453 + --block-time 1)
+#    --chain-id 8453: so MetaMask EIP-712 sigs match USDC's domain
+#    --block-time 1: so blocks advance for commit-reveal (otherwise reveal never happens)
+anvil --fork-url https://base-mainnet.g.alchemy.com/v2/YOUR_ALCHEMY_KEY --chain-id 8453 --block-time 1
+
+# 2. Deploy contracts to fork
+cd packages/foundry
+forge script script/Deploy.s.sol --rpc-url http://127.0.0.1:8545 \
+  --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+  --broadcast --legacy --ffi
+make generate-abis
+
+# 3. Fund the hopper (impersonate the CLAWD multisig whale)
+CLAWD=0x9f86dB9fc6f7c9408e8Fda3Ff8ce4e78ac7a6b07
+WHALE=0x90eF2A9211A3E7CE788561E5af54C76B0Fa3aEd0
+CONTRACT=<deployed-address-from-step-2>
+# Give whale gas
+cast send $WHALE --value 1ether --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --rpc-url http://127.0.0.1:8545
+cast rpc anvil_impersonateAccount $WHALE --rpc-url http://127.0.0.1:8545
+cast send $CLAWD "transfer(address,uint256)" $CONTRACT 500000000000000000000000 --from $WHALE --rpc-url http://127.0.0.1:8545 --unlocked
+
+# 4. Start facilitator + server (separate terminals)
+cd packages/x402-facilitator && node facilitator.js
+cd packages/x402-server && node server.js
+
+# 5. Start frontend
+yarn workspace @se-2/nextjs dev
+# → http://localhost:3000
+```
+
+### Environment Files (Local Dev)
+
+#### `packages/nextjs/.env.local`
+```bash
+NEXT_PUBLIC_BASE_RPC_URL=http://127.0.0.1:8545
+```
+This tells the frontend to use the local fork. When not set, defaults to Alchemy (production).
+
+#### `packages/x402-facilitator/.env`
+```bash
+PORT=8001
+PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80  # Anvil account 0
+BASE_RPC_URL=http://127.0.0.1:8545
+CHAIN_ID=8453
+```
+
+#### `packages/x402-server/.env`
+```bash
+PORT=8000
+USDC_CONTRACT=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+BASE_RPC_URL=http://127.0.0.1:8545
+FACILITATOR_URL=http://localhost:8001
+CHAIN_ID=8453
+```
+
+### Why `--chain-id 8453`?
+
+MetaMask enforces that EIP-712 signature domain `chainId` matches the wallet's active chain. Since the forked USDC contract has its domain permanently set to 8453 (Base), Anvil must also report chainId 8453. Otherwise MetaMask rejects the `transferWithAuthorization` signature with:
+
+> "Provided chainId 8453 must match the active chainId 31337"
+
+### Checklist
+
+- [ ] Anvil running with `--chain-id 8453 --block-time 1`
+- [ ] Contract deployed and address in `broadcast/Deploy.s.sol/8453/run-latest.json`
+- [ ] ABIs generated (`make generate-abis`)
+- [ ] Hopper funded with CLAWD (impersonate whale)
+- [ ] `.env.local` has `NEXT_PUBLIC_BASE_RPC_URL=http://127.0.0.1:8545`
+- [ ] Facilitator `.env` has `CHAIN_ID=8453`
+- [ ] Server `.env` has `CHAIN_ID=8453`
+- [ ] MetaMask on Base network, unlocked
+
+---
+
 # Production Deployment Guide
 
 ## Overview

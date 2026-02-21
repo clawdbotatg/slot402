@@ -51,6 +51,8 @@ export default function Home() {
   const [isX402Rolling, setIsX402Rolling] = useState(false);
   const [x402Error, setX402Error] = useState<string | null>(null);
   const [x402Won, setX402Won] = useState(false);
+  const [winAmount, setWinAmount] = useState<number | null>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
   const isX402RollingRef = useRef(false); // Ref-based guard to prevent rapid double-clicks
 
   // Map Symbol enum to image paths (STAR → CLAW in ClawdSlots)
@@ -59,7 +61,7 @@ export default function Home() {
       "/slot/cherries.png", // 0: CHERRIES
       "/slot/orange.png", // 1: ORANGE
       "/slot/watermelon.png", // 2: WATERMELON
-      "/slot/star.png", // 3: CLAW (using star.png until lobster claw art is ready)
+      "/slot/claw.png", // 3: CLAW
       "/slot/bell.png", // 4: BELL
       "/slot/bar.png", // 5: BAR
       "/slot/doublebar.png", // 6: DOUBLEBAR
@@ -295,7 +297,7 @@ export default function Home() {
           args: [connectedAddress as `0x${string}`, BigInt(revealCommitId)],
         })) as [string, bigint, bigint, bigint, bigint, boolean];
 
-        const amountWon = commitDataResult[3];  // index 3 (after clawdBet)
+        const amountWon = commitDataResult[3]; // index 3 (after clawdBet)
         const amountPaid = commitDataResult[4]; // index 4
 
         updateRevealPayment(revealCommitId, amountPaid, amountWon);
@@ -593,6 +595,7 @@ export default function Home() {
           console.log(`✅ CLAWD winnings auto-claimed: ${result.roll.claimTransaction}`);
         }
         setX402Won(true); // Mark as won so sound plays after animations
+        setWinAmount(clawdPayout);
       }
     } catch (error: any) {
       console.error("❌ x402 roll failed:", error);
@@ -609,18 +612,38 @@ export default function Home() {
       <div className="max-w-4xl w-full">
         {/* Slot Machine — always active (no phase system) */}
         {reel1Symbols.length > 0 && reel2Symbols.length > 0 && reel3Symbols.length > 0 && (
-              <div className="mb-6" style={{ position: "relative" }}>
-                {/* Background image - positioned absolutely under the reels */}
+          <div className="mb-6" style={{ position: "relative" }}>
+            {/* Background image - positioned absolutely under the reels */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/bg/bg025.jpg"
+              alt="Slot machine background"
+              style={{
+                position: "absolute",
+                top: "-20px",
+                left: "53%",
+                transform: "translateX(-50%)",
+                zIndex: 0,
+                pointerEvents: "none",
+                width: "1250px",
+                height: "auto",
+                maxWidth: "none",
+                maxHeight: "none",
+              }}
+            />
+            {/* Pulled lever image - shows briefly when lever is pulled */}
+            {showPulledLever && (
+              <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/bg/bg.jpg"
-                  alt="Slot machine background"
+                  src="/bg/bg025pulled.jpg"
+                  alt="Slot machine lever pulled"
                   style={{
                     position: "absolute",
                     top: "-20px",
                     left: "53%",
                     transform: "translateX(-50%)",
-                    zIndex: 0,
+                    zIndex: 1,
                     pointerEvents: "none",
                     width: "1250px",
                     height: "auto",
@@ -628,269 +651,279 @@ export default function Home() {
                     maxHeight: "none",
                   }}
                 />
-                {/* Pulled lever image - shows briefly when lever is pulled */}
-                {showPulledLever && (
-                  <>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src="/bg/bgpulled.jpg"
-                      alt="Slot machine lever pulled"
-                      style={{
-                        position: "absolute",
-                        top: "-20px",
-                        left: "53%",
-                        transform: "translateX(-50%)",
-                        zIndex: 1,
-                        pointerEvents: "none",
-                        width: "1250px",
-                        height: "auto",
-                        maxWidth: "none",
-                        maxHeight: "none",
-                      }}
+              </>
+            )}
+            <div style={{ position: "absolute", top: "300px", left: "50%", transform: "translateX(-50%)", zIndex: 2 }}>
+              <SlotMachine
+                onSpinStart={() => {}}
+                onAllReelsComplete={() => {
+                  console.log("🎉 All reels animation complete! Button enabled.");
+                  setReelsAnimating(false);
+
+                  // Clear the rolling state now that animations are done
+                  clearRollingState();
+
+                  // If there are pending reveals OR x402 win, play jackpot alarm
+                  if (pendingReveals.length > 0 || x402Won) {
+                    console.log("🔊 Playing jackpot alarm! (pending reveals or x402 win)");
+                    const jackpotAlarm = new Audio("/sounds/541655__timbre__jackpot-alarm.wav");
+                    jackpotAlarm.volume = 0.6;
+                    jackpotAlarm.play().catch(error => {
+                      console.log("Error playing jackpot alarm:", error);
+                    });
+                  }
+
+                  // Reset x402Won flag after playing sound and trigger confetti
+                  if (x402Won) {
+                    setShowConfetti(true);
+                    setTimeout(() => {
+                      setShowConfetti(false);
+                      setWinAmount(null);
+                    }, 4000);
+                    setX402Won(false);
+                  }
+                }}
+                reel1Symbols={reel1Symbols}
+                reel2Symbols={reel2Symbols}
+                reel3Symbols={reel3Symbols}
+                stopPosition1={reelPositions?.reel1 ?? null}
+                stopPosition2={reelPositions?.reel2 ?? null}
+                stopPosition3={reelPositions?.reel3 ?? null}
+                initialPosition1={initialReelPositions?.reel1 ?? null}
+                initialPosition2={initialReelPositions?.reel2 ?? null}
+                initialPosition3={initialReelPositions?.reel3 ?? null}
+                spinCounter={spinCounter}
+              />
+            </div>
+
+            {/* Error Messages - Positioned separately so they don't push buttons */}
+            <div
+              className="flex flex-col items-center gap-2"
+              style={{ position: "absolute", top: "680px", left: "550px", width: "373px" }}
+            >
+              {rollError && (
+                <div className="alert alert-error w-full">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="stroke-current shrink-0 h-6 w-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
-                  </>
-                )}
-                <div
-                  style={{ position: "absolute", top: "300px", left: "50%", transform: "translateX(-50%)", zIndex: 2 }}
-                >
-                  <SlotMachine
-                    onSpinStart={() => {}}
-                    onAllReelsComplete={() => {
-                      console.log("🎉 All reels animation complete! Button enabled.");
-                      setReelsAnimating(false);
-
-                      // Clear the rolling state now that animations are done
-                      clearRollingState();
-
-                      // If there are pending reveals OR x402 win, play jackpot alarm
-                      if (pendingReveals.length > 0 || x402Won) {
-                        console.log("🔊 Playing jackpot alarm! (pending reveals or x402 win)");
-                        const jackpotAlarm = new Audio("/sounds/541655__timbre__jackpot-alarm.wav");
-                        jackpotAlarm.volume = 0.6;
-                        jackpotAlarm.play().catch(error => {
-                          console.log("Error playing jackpot alarm:", error);
-                        });
-                      }
-
-                      // Reset x402Won flag after playing sound
-                      if (x402Won) {
-                        setX402Won(false);
-                      }
-                    }}
-                    reel1Symbols={reel1Symbols}
-                    reel2Symbols={reel2Symbols}
-                    reel3Symbols={reel3Symbols}
-                    stopPosition1={reelPositions?.reel1 ?? null}
-                    stopPosition2={reelPositions?.reel2 ?? null}
-                    stopPosition3={reelPositions?.reel3 ?? null}
-                    initialPosition1={initialReelPositions?.reel1 ?? null}
-                    initialPosition2={initialReelPositions?.reel2 ?? null}
-                    initialPosition3={initialReelPositions?.reel3 ?? null}
-                    spinCounter={spinCounter}
-                  />
+                  </svg>
+                  <span>{rollError}</span>
                 </div>
+              )}
 
-                {/* Error Messages - Positioned separately so they don't push buttons */}
-                <div
-                  className="flex flex-col items-center gap-2"
-                  style={{ position: "absolute", top: "680px", left: "550px", width: "373px" }}
-                >
-                  {rollError && (
-                    <div className="alert alert-error w-full">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="stroke-current shrink-0 h-6 w-6"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                      <span>{rollError}</span>
-                    </div>
-                  )}
-
-                  {x402Error && (
-                    <div className="alert alert-warning w-full">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="stroke-current shrink-0 h-6 w-6"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                      <span>{x402Error}</span>
-                    </div>
-                  )}
+              {x402Error && (
+                <div className="alert alert-warning w-full">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="stroke-current shrink-0 h-6 w-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <span>{x402Error}</span>
                 </div>
+              )}
+            </div>
 
-                {/* User Balance Display - Separate div */}
-                {connectedAddress && usdcBalance !== undefined && (
+            {/* User Balance Display - Separate div */}
+            {connectedAddress && usdcBalance !== undefined && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "283px",
+                  left: "785px",
+                  padding: "6px 4px",
+                  minWidth: "145px",
+                  backgroundColor: "#2d5a66",
+                  border: "3px solid black",
+                  borderRadius: "4px",
+                  boxShadow: "4px 4px 0 0 rgba(0, 0, 0, 0.8)",
+                }}
+              >
+                <div style={{ fontSize: "10px", opacity: 0.8, textAlign: "center" }}>Your Balance</div>
+                <div style={{ fontSize: "13px", fontWeight: "bold", textAlign: "center", color: "#fff" }}>
+                  ${(Number(usdcBalance) / 1e6).toFixed(2)} USDC
+                </div>
+                {clawdBalance !== undefined && clawdBalance > 0n && (
                   <div
                     style={{
-                      position: "absolute",
-                      top: "475px",
-                      left: "795px",
-                      padding: "6px 4px",
-                      minWidth: "145px",
-                      backgroundColor: "#2d5a66",
-                      border: "3px solid black",
-                      borderRadius: "4px",
-                      boxShadow: "4px 4px 0 0 rgba(0, 0, 0, 0.8)",
+                      fontSize: "11px",
+                      fontWeight: "bold",
+                      textAlign: "center",
+                      color: "#fbbf24",
+                      animation: showConfetti ? "pulse 0.5s ease-in-out 3" : "none",
                     }}
                   >
-                    <div style={{ fontSize: "10px", opacity: 0.8, textAlign: "center" }}>Your Balance</div>
-                    <div style={{ fontSize: "13px", fontWeight: "bold", textAlign: "center", color: "#fff" }}>
-                      ${(Number(usdcBalance) / 1e6).toFixed(2)} USDC
-                    </div>
-                    {clawdBalance !== undefined && clawdBalance > 0n && (
-                      <div style={{ fontSize: "11px", fontWeight: "bold", textAlign: "center", color: "#fbbf24" }}>
-                        {(Number(clawdBalance) / 1e18).toLocaleString(undefined, { maximumFractionDigits: 0 })} 🦞
-                      </div>
-                    )}
+                    {(Number(clawdBalance) / 1e18).toLocaleString(undefined, { maximumFractionDigits: 0 })} 🦞
                   </div>
                 )}
-
-                {/* Hopper Balance */}
-                {hopperBalance !== undefined && (
+                {/* Animated win amount floating up */}
+                {showConfetti && winAmount !== null && (
                   <div
                     style={{
                       position: "absolute",
-                      top: "475px",
-                      left: "240px",
-                      padding: "6px 4px",
-                      minWidth: "130px",
-                      backgroundColor: "#2d5a66",
-                      border: "3px solid black",
-                      borderRadius: "4px",
-                      boxShadow: "4px 4px 0 0 rgba(0, 0, 0, 0.8)",
-                    }}
-                  >
-                    <div style={{ fontSize: "10px", opacity: 0.8, textAlign: "center" }}>🦞 Hopper</div>
-                    <div style={{ fontSize: "13px", fontWeight: "bold", textAlign: "center", color: "#4ade80" }}>
-                      {(Number(hopperBalance) / 1e18).toLocaleString(undefined, { maximumFractionDigits: 0 })} CLAWD
-                    </div>
-                  </div>
-                )}
-
-                {/* Roll Button Container — x402 only (gasless!) */}
-                <div
-                  className="flex flex-col items-center gap-4"
-                  style={{ position: "absolute", top: "615px", left: "550px" }}
-                >
-                  {/* Single x402 Roll Button */}
-                  <div className="flex gap-3">
-                    <button
-                      className="btn btn-secondary btn-lg"
-                      style={{
-                        width: "373px",
-                        height: "33px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        padding: "1rem",
-                        borderRadius: "0",
-                        backgroundColor:
-                          !!connectedAddress &&
-                          (isX402Rolling || isCommitting || isPolling || reelsAnimating || commitCount === undefined)
-                            ? "#666666"
-                            : "#e24a4a",
-                        fontSize: "14px",
-                        fontWeight: "bold",
-                        boxShadow:
-                          !!connectedAddress && isX402Rolling
-                            ? "none"
-                            : "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 13px 0 0 black",
-                        position: "relative",
-                        zIndex: 10,
-                        border: "4px solid black",
-                        transform:
-                          !!connectedAddress && isX402Rolling
-                            ? "perspective(400px) rotateX(8deg) translateY(8px)"
-                            : "perspective(400px) rotateX(8deg)",
-                        transformStyle: "preserve-3d",
-                        transition: "transform 0.1s ease, box-shadow 0.1s ease, background-color 0.1s ease",
-                      }}
-                      onClick={handleX402Roll}
-                      disabled={
-                        !!connectedAddress &&
-                        (isX402Rolling || isCommitting || isPolling || reelsAnimating || commitCount === undefined)
-                      }
-                      onMouseDown={e => {
-                        if (!e.currentTarget.disabled) {
-                          e.currentTarget.style.transform = "perspective(400px) rotateX(8deg) translateY(4px)";
-                          e.currentTarget.style.boxShadow = "4px 4px 0 0 rgba(0, 0, 0, 0.8), 0 4px 0 0 black";
-                        }
-                      }}
-                      onMouseUp={e => {
-                        if (!e.currentTarget.disabled) {
-                          e.currentTarget.style.transform = "perspective(400px) rotateX(8deg)";
-                          e.currentTarget.style.boxShadow = "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black";
-                        }
-                      }}
-                      onMouseLeave={e => {
-                        if (!e.currentTarget.disabled) {
-                          e.currentTarget.style.transform = "perspective(400px) rotateX(8deg)";
-                          e.currentTarget.style.boxShadow = "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black";
-                        }
-                      }}
-                    >
-                      {!connectedAddress ? "🦞 Connect Wallet" : isX402Rolling ? "🦞 Rolling..." : "🦞 SPIN — Win CLAWD!"}
-                    </button>
-                  </div>
-
-                  {/* Swap button when insufficient USDC */}
-                  {connectedAddress && usdcBalance !== undefined && usdcBalance < 21000n && (
-                    <button
-                      className="btn btn-warning btn-sm mt-2"
-                      style={{
-                        width: "333px",
-                        fontSize: "12px",
-                        border: "2px solid black",
-                      }}
-                      onClick={() => setShowSwapModal(true)}
-                    >
-                      💱 Swap ETH for USDC (need USDC to play)
-                    </button>
-                  )}
-                </div>
-
-                {/* Pending Reveals - positioned over the slot machine */}
-                {/* Only show uncollected winnings after reels finish animating */}
-                {!reelsAnimating && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "750px",
+                      top: "-10px",
                       left: "50%",
                       transform: "translateX(-50%)",
+                      fontSize: "18px",
+                      fontWeight: "bold",
+                      color: "#22c55e",
+                      textShadow: "0 0 10px rgba(34, 197, 94, 0.8), 2px 2px 0 black",
+                      animation: "floatUp 3s ease-out forwards",
+                      pointerEvents: "none",
+                      whiteSpace: "nowrap",
                       zIndex: 100,
-                      width: "90%",
-                      maxWidth: "800px",
                     }}
                   >
-                    <PendingRevealsSection
-                      pendingReveals={pendingReveals}
-                      currentBlockNumber={currentBlockNumber}
-                      onCollect={handleCollectFromReveal}
-                      onRemove={removeReveal}
-                    />
+                    +{winAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })} 🦞
                   </div>
                 )}
-
-                {/* Spacer to push content below fixed elements */}
-                <div style={{ height: "800px" }}></div>
               </div>
+            )}
+
+            {/* Hopper Balance */}
+            {hopperBalance !== undefined && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "475px",
+                  left: "240px",
+                  padding: "6px 4px",
+                  minWidth: "130px",
+                  backgroundColor: "#2d5a66",
+                  border: "3px solid black",
+                  borderRadius: "4px",
+                  boxShadow: "4px 4px 0 0 rgba(0, 0, 0, 0.8)",
+                }}
+              >
+                <div style={{ fontSize: "10px", opacity: 0.8, textAlign: "center" }}>🦞 Hopper</div>
+                <div style={{ fontSize: "13px", fontWeight: "bold", textAlign: "center", color: "#4ade80" }}>
+                  {(Number(hopperBalance) / 1e18).toLocaleString(undefined, { maximumFractionDigits: 0 })} CLAWD
+                </div>
+              </div>
+            )}
+
+            {/* Roll Button Container — x402 only (gasless!) */}
+            <div
+              className="flex flex-col items-center gap-4"
+              style={{ position: "absolute", top: "609px", left: "750px" }}
+            >
+              {/* Single x402 Roll Button */}
+              <div className="flex gap-3">
+                <button
+                  className="btn btn-secondary btn-lg"
+                  style={{
+                    width: "200px",
+                    height: "28px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "1rem",
+                    borderRadius: "0",
+                    backgroundColor:
+                      !!connectedAddress &&
+                      (isX402Rolling || isCommitting || isPolling || reelsAnimating || commitCount === undefined)
+                        ? "#666666"
+                        : "#e24a4a",
+                    fontSize: "14px",
+                    fontWeight: "bold",
+                    boxShadow:
+                      !!connectedAddress && isX402Rolling ? "none" : "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 13px 0 0 black",
+                    position: "relative",
+                    zIndex: 10,
+                    border: "4px solid black",
+                    transform:
+                      !!connectedAddress && isX402Rolling
+                        ? "perspective(400px) rotateX(8deg) translateY(8px)"
+                        : "perspective(400px) rotateX(8deg)",
+                    transformStyle: "preserve-3d",
+                    transition: "transform 0.1s ease, box-shadow 0.1s ease, background-color 0.1s ease",
+                  }}
+                  onClick={handleX402Roll}
+                  disabled={
+                    !!connectedAddress &&
+                    (isX402Rolling || isCommitting || isPolling || reelsAnimating || commitCount === undefined)
+                  }
+                  onMouseDown={e => {
+                    if (!e.currentTarget.disabled) {
+                      e.currentTarget.style.transform = "perspective(400px) rotateX(8deg) translateY(4px)";
+                      e.currentTarget.style.boxShadow = "4px 4px 0 0 rgba(0, 0, 0, 0.8), 0 4px 0 0 black";
+                    }
+                  }}
+                  onMouseUp={e => {
+                    if (!e.currentTarget.disabled) {
+                      e.currentTarget.style.transform = "perspective(400px) rotateX(8deg)";
+                      e.currentTarget.style.boxShadow = "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black";
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (!e.currentTarget.disabled) {
+                      e.currentTarget.style.transform = "perspective(400px) rotateX(8deg)";
+                      e.currentTarget.style.boxShadow = "6px 6px 0 0 rgba(0, 0, 0, 0.8), 0 8px 0 0 black";
+                    }
+                  }}
+                >
+                  {!connectedAddress ? "Connect Wallet" : isX402Rolling ? "Rolling..." : "Spin"}
+                </button>
+              </div>
+
+              {/* Swap button when insufficient USDC */}
+              {connectedAddress && usdcBalance !== undefined && usdcBalance < 250000n && (
+                <button
+                  className="btn btn-warning btn-sm mt-2"
+                  style={{
+                    width: "333px",
+                    fontSize: "12px",
+                    border: "2px solid black",
+                  }}
+                  onClick={() => setShowSwapModal(true)}
+                >
+                  💱 Swap ETH for USDC (need USDC to play)
+                </button>
+              )}
+            </div>
+
+            {/* Pending Reveals - positioned over the slot machine */}
+            {/* Only show uncollected winnings after reels finish animating */}
+            {!reelsAnimating && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "750px",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  zIndex: 100,
+                  width: "90%",
+                  maxWidth: "800px",
+                }}
+              >
+                <PendingRevealsSection
+                  pendingReveals={pendingReveals}
+                  currentBlockNumber={currentBlockNumber}
+                  onCollect={handleCollectFromReveal}
+                  onRemove={removeReveal}
+                />
+              </div>
+            )}
+
+            {/* Spacer to push content below fixed elements */}
+            <div style={{ height: "800px" }}></div>
+          </div>
         )}
 
         <div style={{ marginTop: "500px" }}>
@@ -914,33 +947,33 @@ export default function Home() {
 
           {/* x402 API Reference */}
           <div className="mt-12 bg-base-200 rounded-lg p-8 border-4 border-primary">
-              <h2 className="text-3xl font-bold mb-6 text-center">⚡ x402 Gasless Roll API</h2>
+            <h2 className="text-3xl font-bold mb-6 text-center">⚡ x402 Gasless Roll API</h2>
 
-              {/* Endpoints */}
-              <div className="bg-base-300 p-6 rounded-lg mb-6">
-                <h3 className="text-xl font-bold mb-4">📡 Endpoints</h3>
-                <div className="space-y-3 text-sm font-mono">
-                  <div className="flex items-center gap-3">
-                    <span className="badge badge-primary">POST</span>
-                    <code>https://api.slot402.com:8000/roll</code>
-                    <span className="opacity-60">- Request a roll (returns 402 Payment Required)</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="badge badge-success">POST</span>
-                    <code>https://api.slot402.com:8000/roll/submit</code>
-                    <span className="opacity-60">- Submit signatures and get result</span>
-                  </div>
+            {/* Endpoints */}
+            <div className="bg-base-300 p-6 rounded-lg mb-6">
+              <h3 className="text-xl font-bold mb-4">📡 Endpoints</h3>
+              <div className="space-y-3 text-sm font-mono">
+                <div className="flex items-center gap-3">
+                  <span className="badge badge-primary">POST</span>
+                  <code>https://api.slot402.com:8000/roll</code>
+                  <span className="opacity-60">- Request a roll (returns 402 Payment Required)</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="badge badge-success">POST</span>
+                  <code>https://api.slot402.com:8000/roll/submit</code>
+                  <span className="opacity-60">- Submit signatures and get result</span>
                 </div>
               </div>
+            </div>
 
-              {/* Client Code Example */}
-              <div className="rounded-lg overflow-hidden">
-                <div className="bg-[#1e1e1e] px-6 py-3 border-b border-gray-700 flex justify-between items-center">
-                  <h3 className="text-lg font-bold text-white">💻 Client Code Example</h3>
-                  <button
-                    className="btn btn-sm btn-ghost text-white hover:bg-gray-700"
-                    onClick={() => {
-                      const code = `// ═══════════════════════════════════════════════════════════════════════════════
+            {/* Client Code Example */}
+            <div className="rounded-lg overflow-hidden">
+              <div className="bg-[#1e1e1e] px-6 py-3 border-b border-gray-700 flex justify-between items-center">
+                <h3 className="text-lg font-bold text-white">💻 Client Code Example</h3>
+                <button
+                  className="btn btn-sm btn-ghost text-white hover:bg-gray-700"
+                  onClick={() => {
+                    const code = `// ═══════════════════════════════════════════════════════════════════════════════
 // SLOT402 CLIENT - Complete copy/paste example for ethers v6
 // Create .env file with PRIVATE_KEY=0x... then run: node slot402.js
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1057,37 +1090,37 @@ if (result.roll.won) {
   console.log(\`🏆 WON \${result.roll.payout}!\`);
   console.log(\`✅ https://basescan.org/tx/\${result.roll.claimTransaction}\`);
 }`;
-                      navigator.clipboard.writeText(code);
-                      const btn = document.activeElement as HTMLButtonElement;
-                      const originalText = btn.textContent;
-                      btn.textContent = "Copied!";
-                      setTimeout(() => {
-                        btn.textContent = originalText;
-                      }, 2000);
-                    }}
-                  >
-                    📋 Copy
-                  </button>
-                </div>
-                {/* @ts-ignore - Type incompatibility with React 19 */}
-                <SyntaxHighlighter
-                  language="javascript"
-                  style={vscDarkPlus}
-                  showLineNumbers={true}
-                  customStyle={{
-                    margin: 0,
-                    padding: "1.5rem",
-                    fontSize: "0.875rem",
-                    background: "#000000",
-                  }}
-                  lineNumberStyle={{
-                    minWidth: "3em",
-                    paddingRight: "1em",
-                    color: "#858585",
-                    userSelect: "none",
+                    navigator.clipboard.writeText(code);
+                    const btn = document.activeElement as HTMLButtonElement;
+                    const originalText = btn.textContent;
+                    btn.textContent = "Copied!";
+                    setTimeout(() => {
+                      btn.textContent = originalText;
+                    }, 2000);
                   }}
                 >
-                  {`// ═══════════════════════════════════════════════════════════════════════════════
+                  📋 Copy
+                </button>
+              </div>
+              {/* @ts-ignore - Type incompatibility with React 19 */}
+              <SyntaxHighlighter
+                language="javascript"
+                style={vscDarkPlus}
+                showLineNumbers={true}
+                customStyle={{
+                  margin: 0,
+                  padding: "1.5rem",
+                  fontSize: "0.875rem",
+                  background: "#000000",
+                }}
+                lineNumberStyle={{
+                  minWidth: "3em",
+                  paddingRight: "1em",
+                  color: "#858585",
+                  userSelect: "none",
+                }}
+              >
+                {`// ═══════════════════════════════════════════════════════════════════════════════
 // SLOT402 CLIENT - Complete copy/paste example for ethers v6
 // Create .env file with PRIVATE_KEY=0x... then run: node slot402.js
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1204,9 +1237,9 @@ if (result.roll.won) {
   console.log(\`🏆 WON \${result.roll.payout}!\`);
   console.log(\`✅ https://basescan.org/tx/\${result.roll.claimTransaction}\`);
 }`}
-                </SyntaxHighlighter>
-              </div>
+              </SyntaxHighlighter>
             </div>
+          </div>
 
           {/* View Smart Contracts Button */}
           <div className="mt-12 mb-8 flex justify-center">
@@ -1268,6 +1301,66 @@ if (result.roll.won) {
           </div>
         )}
       </div>
+
+      {/* Lobster Confetti */}
+      {showConfetti && (
+        <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 9999, overflow: "hidden" }}>
+          {Array.from({ length: 40 }).map((_, i) => (
+            <div
+              key={i}
+              style={{
+                position: "absolute",
+                left: `${Math.random() * 100}%`,
+                top: `-5%`,
+                fontSize: `${16 + Math.random() * 24}px`,
+                animation: `confettiFall ${2 + Math.random() * 3}s ease-in forwards`,
+                animationDelay: `${Math.random() * 1.5}s`,
+                transform: `rotate(${Math.random() * 360}deg)`,
+              }}
+            >
+              🦞
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* CSS Animations */}
+      <style jsx global>{`
+        @keyframes floatUp {
+          0% {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+          }
+          70% {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-60px);
+          }
+          100% {
+            opacity: 0;
+            transform: translateX(-50%) translateY(-80px);
+          }
+        }
+        @keyframes confettiFall {
+          0% {
+            transform: translateY(0) rotate(0deg);
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(110vh) rotate(720deg);
+            opacity: 0.3;
+          }
+        }
+        @keyframes pulse {
+          0%,
+          100% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.3);
+            color: #22c55e;
+          }
+        }
+      `}</style>
     </div>
   );
 }

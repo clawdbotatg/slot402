@@ -2185,6 +2185,7 @@ __metadata:
 "@next/swc-darwin-arm64@npm:15.2.5":
   version: 15.2.5
   resolution: "@next/swc-darwin-arm64@npm:15.2.5"
+  checksum: 62d6f796419ac2c7d6f3c226b4dd74cc7ff5bb56da6d28c20c60db9167b29a7516ac04af17db78f5bf13edc2ba0adcc78b0f30001975ce4cd7362132ed6c1cac
   conditions: os=darwin & cpu=arm64
   languageName: node
   linkType: hard
@@ -3084,6 +3085,7 @@ __metadata:
   resolution: "@se-2/nextjs@workspace:packages/nextjs"
   dependencies:
     "@heroicons/react": ~2.1.5
+    "@next/swc-darwin-arm64": 15.2.5
     "@rainbow-me/rainbowkit": 2.2.8
     "@tailwindcss/postcss": 4.0.15
     "@tanstack/react-query": ~5.59.15

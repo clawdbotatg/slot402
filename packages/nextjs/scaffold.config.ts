@@ -27,10 +27,9 @@ const scaffoldConfig = {
   // The key is the chain ID, and the value is the HTTP RPC URL
   rpcOverrides: {
     [chains.mainnet.id]: "https://mainnet.rpc.buidlguidl.com",
-    // PRODUCTION: Use Alchemy for Base RPC
-    [chains.base.id]: `https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || DEFAULT_ALCHEMY_API_KEY}`,
-    // DEV (uncomment for local fork testing):
-    // [chains.base.id]: "http://127.0.0.1:8545",
+    [chains.base.id]:
+      process.env.NEXT_PUBLIC_BASE_RPC_URL ||
+      `https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || DEFAULT_ALCHEMY_API_KEY}`,
   },
   // This is ours WalletConnect's default project ID.
   // You can get your own at https://cloud.walletconnect.com

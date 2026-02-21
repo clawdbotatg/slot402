@@ -62,12 +62,10 @@ async function initializeNonce() {
 /**
  * Get next nonce for transaction
  */
-function getNextNonce() {
-  if (currentNonce === null) {
-    throw new Error('Nonce not initialized');
-  }
-  const nonce = currentNonce;
-  currentNonce++;
+async function getNextNonce() {
+  // Always fetch fresh nonce from chain to avoid stale nonce issues
+  const nonce = await provider.getTransactionCount(wallet.address, 'pending');
+  console.log(`   🔢 Fresh nonce from chain: ${nonce}`);
   return nonce;
 }
 
@@ -324,7 +322,7 @@ async function checkAndRefillETH() {
       async () => {
         // Approve Uniswap router to spend USDC
         console.log(`   Approving Uniswap router...`);
-        const approveNonce = getNextNonce();
+        const approveNonce = await getNextNonce();
         const approveTx = await usdcContract.approve(
           UNISWAP_V2_ROUTER,
           usdcBalance,
@@ -356,7 +354,7 @@ async function checkAndRefillETH() {
         const deadline = Math.floor(Date.now() / 1000) + 300; // 5 minutes
 
         console.log(`   Executing swap...`);
-        const swapNonce = getNextNonce();
+        const swapNonce = await getNextNonce();
         const swapTx = await routerContract.swapExactTokensForETH(
           usdcBalance,
           minAmountOut,
@@ -671,7 +669,7 @@ app.post("/settle", async (req, res) => {
       metaCommit.player,
       metaCommit.nonce,
       async () => {
-        const txNonce = getNextNonce();
+        const txNonce = await getNextNonce();
         console.log(`   🔢 Using facilitator nonce: ${txNonce}`);
         
         const tx = await rugSlotContract.commitWithMetaTransaction(
@@ -812,7 +810,7 @@ app.post("/claim", async (req, res) => {
           player,
           commitId, // Use commitId as ordering nonce for claims
           async () => {
-            const txNonce = getNextNonce();
+            const txNonce = await getNextNonce();
             console.log(`   🔢 Using facilitator nonce: ${txNonce}`);
             
             // Call revealAndCollectFor
